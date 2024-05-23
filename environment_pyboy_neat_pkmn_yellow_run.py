@@ -15,15 +15,15 @@ import random
 
 
 class GbaGame(Env):
-    def __init__(self, max_episodes=200000):
+    def __init__(self, max_episodes=100000):
         super().__init__()
-        self.frame_stack = deque(maxlen=4)
+        self.frame_stack = deque(maxlen=1)
         self.frame_skip = 1  # Number of frames to skip
         # Adjust observation space to 3D for CNN compatibility
-        self.observation_space = Box(low=0, high=255, shape=(120, 120, 4), dtype=np.uint8)
+        self.observation_space = Box(low=0, high=255, shape=(120, 120, 1), dtype=np.uint8)
         self.action_space = Discrete(6)
         self.cap = mss()
-        self.pyboy = PyBoy('ROMs/Pokemon_Yellow.gbc', window_type="headless",
+        self.pyboy = PyBoy('ROMs/Pokemon_Red.gb', window_type="headless",
                            window_scale=3, game_wrapper=False)
         self.game_location = {'top': 53, 'left': 0, 'width': 318, 'height': 339}
         self.score_location = {'top': 53, 'left': 65, 'width': 70, 'height': 25}
@@ -110,7 +110,7 @@ class GbaGame(Env):
             self.pyboy.stop()
             del self.pyboy
             self.pyboy_counter = 0
-            self.pyboy = PyBoy('ROMs/Pokemon_Yellow.gbc', window_type="headless",
+            self.pyboy = PyBoy('ROMs/Pokemon_Red.gb', window_type="headless",
                                window_scale=3, game_wrapper=False)
         if seed:
             np.random.seed(seed)
@@ -123,16 +123,15 @@ class GbaGame(Env):
         return self.get_stacked_observation(), {}
 
     def render(self):
-        raw_screen = self.pyboy.botsupport_manager().screen().screen_ndarray()
-        raw = np.array(raw_screen)[:, :, :3].astype(np.uint8)
+        raw = np.array(self.pyboy.screen_image())[:, :, :3].astype(np.uint8)
         # gray = cv2.cvtColor(raw, cv2.COLOR_BGR2GRAY)
         # edges = cv2.Canny(gray, threshold1=100, threshold2=200)
         # resized = cv2.resize(edges, (60, 60))
         # resized = cv2.resize(edges, (120, 120))
-        # rgb = cv2.cvtColor(raw, cv2.COLOR_BGR2RGB)
+        rgb = cv2.cvtColor(raw, cv2.COLOR_BGR2RGB)
         # cv2.imshow('Game', resized)  # Display the cropped image
         label = str(self.agent_id)
-        cv2.imshow(label, raw)  # Display the cropped image
+        cv2.imshow(label, rgb)  # Display the cropped image
         if cv2.waitKey(1) & 0xFF == ord('q'):
             self.close()
 
@@ -141,9 +140,8 @@ class GbaGame(Env):
         self.pyboy.stop()
 
     def get_observation(self):
-        raw_screen = self.pyboy.botsupport_manager().screen().screen_ndarray()
-        raw = np.array(raw_screen)[:, :, :3].astype(np.uint8)
-        gray = cv2.cvtColor(raw, cv2.COLOR_RGB2GRAY)
+        raw = np.array(self.pyboy.screen_image())[:, :, :3].astype(np.uint8)
+        gray = cv2.cvtColor(raw, cv2.COLOR_BGR2GRAY)
         # Define the top-left corner and the size of the crop area
         # x_start = 25  # Starting x-coordinate of the crop area
         # y_start = 40  # Starting y-coordinate of the crop area
@@ -260,24 +258,8 @@ class GbaGame(Env):
         if did_ash_faint:
             # Apply the penalty for falling and set penalty_cap to True to avoid repeated penalties
             reward += -1  # Assigning a negative reward
-            self.truncated = True
+            # self.truncated = True
             print("Ash is fainted")
-        did_ash_get_stuck = self.is_ash_stuck()
-        if did_ash_get_stuck:
-            if self.ash_stuck_counter >= 3000:
-                reward += -0.01
-                # print("Ash is stuck")
-                # print("Ash stuck Counter =", self.ash_stuck_counter)
-                if self.ash_stuck_counter >= 5000:
-                    self.truncated = True
-                    reward += -1
-                    print(self.agent_id)
-                    print("Ash not unstuck, exiting")
-            else:
-                if self.is_battling_fl != True:
-                    reward += 0.001
-                    # print(self.agent_id)
-                    # print("Ash got explore reward")
         did_level_progress = self.level_did_progress()
         if did_level_progress > 0:
             # mu = 0.80  # Shifts the peak towards the end
@@ -326,7 +308,7 @@ class GbaGame(Env):
             self.pyboy.tick()
         # List of specific filenames
         gamestate_filenames = [
-            "ROMs/Pokemon_Yellow.gbc.state"
+            "ROMs/Pokemon_Red.gb.state"
         ]
         # Select a random filename from the list
         selected_filename = random.choice(gamestate_filenames)

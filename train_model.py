@@ -28,13 +28,13 @@ def train_model(env_class, model_path, time_steps):
     total_time_steps = time_steps
     callback = cb.TrainAndLoggingCallback(check_freq=4096, save_path=checkpoint_dir)
 
-    # policy_kwargs = dict(
-        # net_arch=[dict(pi=[64, 64, 64], vf=[64, 64, 64])]  # Example architecture: separate networks for policy and value
-    # )
+    policy_kwargs = dict(
+        net_arch=[dict(pi=[256, 128, 64], vf=[256, 128, 64])]  # Example architecture: separate networks for policy and value
+    )
 
-    model = PPO('CnnPolicy', env, tensorboard_log=log_dir,
+    model = PPO('CnnPolicy', env, policy_kwargs=policy_kwargs, tensorboard_log=log_dir,
                 verbose=1, gamma=0.999, n_steps=2048,
-                n_epochs=1, batch_size=512, ent_coef=0.5)
+                n_epochs=2, batch_size=512, ent_coef=0.03, learning_rate=0.00003)
     if model_path:
         pass
         # model.load(model_path)
@@ -44,5 +44,5 @@ def train_model(env_class, model_path, time_steps):
 
 
 if __name__ == '__main__':
-    model_pth = 'train/end_of_training_run2.zip'
-    train_model(emt.GbaGame, model_pth, time_steps=3000000)
+    model_pth = 'train/end_of_training_run7.zip'
+    train_model(emt.GbaGame, model_pth, time_steps=10000000)

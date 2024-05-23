@@ -40,7 +40,7 @@ def preprocess_observation(obs):
     return normalized_obs
 
 
-def simulate_species(net, env, episodes=1, steps=5000, render=False):
+def simulate_species(net, env, episodes=1, steps=100000, render=False):
     fitnesses = []
     for _ in range(episodes):
         obs, _ = env.reset()

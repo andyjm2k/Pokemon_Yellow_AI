@@ -1,8 +1,11 @@
 import environment_pyboy_neat_pkmn_yellow as emt
+from stable_baselines3.common.atari_wrappers import MaxAndSkipEnv
 
 
 def run_episodes(env_class, model_path, num_episodes=10):
     env = env_class()
+    env.max_episodes = 1000000000000
+    env = MaxAndSkipEnv(env, 15)
     model = emt.PPO.load(model_path, env=env)
 
     for episode in range(num_episodes):
@@ -23,5 +26,5 @@ def run_episodes(env_class, model_path, num_episodes=10):
 
 
 if __name__ == "__main__":
-    mdl_path = 'train/best_model_376832.zip'
+    mdl_path = 'train/end_of_training_run9.zip'
     run_episodes(emt.GbaGame, mdl_path, num_episodes=1)
