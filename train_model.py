@@ -44,5 +44,5 @@ def train_model(env_class, model_path, time_steps):
 
 
 if __name__ == '__main__':
-    model_pth = 'train/end_of_training_run7.zip'
-    train_model(emt.GbaGame, model_pth, time_steps=10000000)
+    model_pth = 'train/end_of_training_run12.zip'
+    train_model(emt.GbaGame, model_pth, time_steps=20000000)

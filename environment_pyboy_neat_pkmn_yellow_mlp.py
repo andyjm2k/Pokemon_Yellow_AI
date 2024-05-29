@@ -342,7 +342,7 @@ class GbaGame(Env):
             self.pyboy.tick()
         # List of specific filenames
         gamestate_filenames = [
-            "ROMs/Pokemon_Yellow.gbc.state"
+            "ROMs/Pokemon_Yellow.gbc.state.old2"
         ]
         # Select a random filename from the list
         selected_filename = random.choice(gamestate_filenames)

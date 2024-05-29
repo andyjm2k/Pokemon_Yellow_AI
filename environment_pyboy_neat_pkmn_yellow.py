@@ -15,12 +15,12 @@ import random
 
 
 class GbaGame(Env):
-    def __init__(self, max_episodes=200000):
+    def __init__(self, max_episodes=400000):
         super().__init__()
-        self.frame_stack = deque(maxlen=4)
+        self.frame_stack = deque(maxlen=1)
         self.frame_skip = 1  # Number of frames to skip
         # Adjust observation space to 3D for CNN compatibility
-        self.observation_space = Box(low=0, high=255, shape=(120, 120, 4), dtype=np.uint8)
+        self.observation_space = Box(low=0, high=255, shape=(120, 120, 1), dtype=np.uint8)
         self.action_space = Discrete(6)
         self.cap = mss()
         self.pyboy = PyBoy('ROMs/Pokemon_Yellow.gbc', window_type="headless",
@@ -142,6 +142,7 @@ class GbaGame(Env):
 
     def get_observation(self):
         raw_screen = self.pyboy.botsupport_manager().screen().screen_ndarray()
+        # print('raw_screen = ', np.shape(raw_screen))
         raw = np.array(raw_screen)[:, :, :3].astype(np.uint8)
         gray = cv2.cvtColor(raw, cv2.COLOR_RGB2GRAY)
         # Define the top-left corner and the size of the crop area
@@ -232,7 +233,7 @@ class GbaGame(Env):
             print("got battling reward")
         if self.did_damage():
             if self.new_enemy_hp == 0:
-                reward += 10
+                reward += 1
                 print(self.agent_id)
                 print("beat pokemon reward")
             else:
@@ -241,7 +242,7 @@ class GbaGame(Env):
                 print("did damage reward")
         # Check if the total HP of your pokemon has dropped and penalise
         if self.did_hp_drop():
-            reward += -0.01
+            reward += -0
             print(self.agent_id)
             print("HP dropped")
         # print("No new points scored, reward remains 0")
@@ -275,7 +276,12 @@ class GbaGame(Env):
                     print("Ash not unstuck, exiting")
             else:
                 if self.is_battling_fl != True:
-                    reward += 0.001
+                    v_0 = self.pyboy.get_memory_value(0xd35d)
+                    v_1 = self.pyboy.get_memory_value(0xd360)
+                    v_2 = self.pyboy.get_memory_value(0xd361)
+                    loc = (v_1 * v_2) * v_0
+                    if loc not in self.ash_loc_dict:
+                        reward += 0.001
                     # print(self.agent_id)
                     # print("Ash got explore reward")
         did_level_progress = self.level_did_progress()
@@ -286,7 +292,7 @@ class GbaGame(Env):
             # reward += gaussian_reward * 1000  # Scale the reward
             print(self.agent_id)
             print("level progressed = ", self.level_progress)
-            reward += 2
+            reward += 10
 
         return reward
 
@@ -356,7 +362,7 @@ class GbaGame(Env):
                 score = 0
             else:
                 score = values - self.current_score
-                score = score * 1
+                score = score * 10
                 self.current_score += score
         else:
             score = 0
