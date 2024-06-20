@@ -26,5 +26,5 @@ def run_episodes(env_class, model_path, num_episodes=10):
 
 
 if __name__ == "__main__":
-    mdl_path = 'train/best_model_217088.zip'
+    mdl_path = 'train/best_model_626688.zip'
     run_episodes(emt.GbaGame, mdl_path, num_episodes=1)

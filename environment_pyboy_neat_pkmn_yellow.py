@@ -20,7 +20,7 @@ class GbaGame(Env):
         self.frame_stack = deque(maxlen=1)
         self.frame_skip = 1  # Number of frames to skip
         # Adjust observation space to 3D for CNN compatibility
-        self.observation_space = Box(low=0, high=255, shape=(120, 120, 1), dtype=np.uint8)
+        self.observation_space = Box(low=0, high=255, shape=(120, 120, 3), dtype=np.uint8)
         self.action_space = Discrete(6)
         self.cap = mss()
         self.pyboy = PyBoy('ROMs/Pokemon_Yellow.gbc', window_type="headless",
@@ -42,6 +42,7 @@ class GbaGame(Env):
         self.pyboy_counter = 0
         self.level_progress = [-1]
         self.ash_loc_dict = [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1]
+        self.pokemon_found_list = [-1]
         self.level_progress_pct = 0.0
         self.ash_is_moving = 0
         self.ash_stuck_counter = 0
@@ -62,6 +63,7 @@ class GbaGame(Env):
         self.episode_length = 0
         self.current_score = 0
         self.level_progress = [-1]
+        self.pokemon_found_list = [-1]
         self.ash_loc_dict = [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1]
         self.level_progress_pct = 0.0
         self.ash_is_moving = 0
@@ -144,7 +146,7 @@ class GbaGame(Env):
         raw_screen = self.pyboy.botsupport_manager().screen().screen_ndarray()
         # print('raw_screen = ', np.shape(raw_screen))
         raw = np.array(raw_screen)[:, :, :3].astype(np.uint8)
-        gray = cv2.cvtColor(raw, cv2.COLOR_RGB2GRAY)
+        gray = cv2.cvtColor(raw, cv2.COLOR_RGB2BGR)
         # Define the top-left corner and the size of the crop area
         # x_start = 25  # Starting x-coordinate of the crop area
         # y_start = 40  # Starting y-coordinate of the crop area
@@ -155,7 +157,8 @@ class GbaGame(Env):
         # edges = cv2.Canny(gray, threshold1=100, threshold2=200)
         # resized = cv2.resize(edges, (120, 120))
         resized = cv2.resize(gray, (120, 120))
-        return resized[:, :, np.newaxis]
+        #return resized[:, :, np.newaxis]
+        return resized
 
     def get_stacked_observation(self):
         # The shape of each frame should be (80, 72, 1)
@@ -228,12 +231,12 @@ class GbaGame(Env):
             print("Total Lvls went up by=", current_score)
         # encourage battling by rewarding when in battle mode
         if self.battling():
-            reward += 1
+            reward += 0
             print(self.agent_id)
             print("got battling reward")
         if self.did_damage():
             if self.new_enemy_hp == 0:
-                reward += 1
+                reward += 10
                 print(self.agent_id)
                 print("beat pokemon reward")
             else:
@@ -271,19 +274,28 @@ class GbaGame(Env):
                 # print("Ash stuck Counter =", self.ash_stuck_counter)
                 if self.ash_stuck_counter >= 5000:
                     self.truncated = True
-                    reward += -1
+                    reward += -10
                     print(self.agent_id)
                     print("Ash not unstuck, exiting")
+        else:
+            if self.is_battling_fl != True:
+                v_0 = self.pyboy.get_memory_value(0xd35d)
+                v_1 = self.pyboy.get_memory_value(0xd360)
+                v_2 = self.pyboy.get_memory_value(0xd361)
+                loc = (v_1 * v_2) * v_0
+                if loc not in self.ash_loc_dict:
+                    reward += 0.001
+                    self.ash_loc_dict.append(loc)
+                    if len(self.ash_loc_dict) > 5000:
+                        self.ash_loc_dict.pop(0)
+                    print(self.agent_id)
+                    print("Ash got explore reward")
             else:
-                if self.is_battling_fl != True:
-                    v_0 = self.pyboy.get_memory_value(0xd35d)
-                    v_1 = self.pyboy.get_memory_value(0xd360)
-                    v_2 = self.pyboy.get_memory_value(0xd361)
-                    loc = (v_1 * v_2) * v_0
-                    if loc not in self.ash_loc_dict:
-                        reward += 0.001
-                    # print(self.agent_id)
-                    # print("Ash got explore reward")
+                if self.new_pokemon_found() == 1:
+                    reward += 10
+                    print(self.agent_id)
+                    print("Ash found a new pokemon reward")
+
         did_level_progress = self.level_did_progress()
         if did_level_progress > 0:
             # mu = 0.80  # Shifts the peak towards the end
@@ -293,7 +305,6 @@ class GbaGame(Env):
             print(self.agent_id)
             print("level progressed = ", self.level_progress)
             reward += 10
-
         return reward
 
     def detect_ash_faint(self):
@@ -332,7 +343,9 @@ class GbaGame(Env):
             self.pyboy.tick()
         # List of specific filenames
         gamestate_filenames = [
-            "ROMs/Pokemon_Yellow.gbc.state"
+            "ROMs/Pokemon_Yellow.gbc.state",
+            "ROMs/Pokemon_Yellow.gbc.state.old",
+            "ROMs/Pokemon_Yellow.gbc.state.pewter"
         ]
         # Select a random filename from the list
         selected_filename = random.choice(gamestate_filenames)
@@ -412,29 +425,24 @@ class GbaGame(Env):
         if self.ash_is_moving == 0:
             self.ash_is_moving = loc
             return stuck
-        if self.ash_is_moving == loc:
+        elif self.ash_is_moving == loc:
             if self.pyboy.get_memory_value(0xd056) == 0:
                 stuck = True
                 self.ash_stuck_counter += 1
                 return stuck
-        if loc in last_20:
+        elif loc in last_20:
             if self.pyboy.get_memory_value(0xd056) == 0:
                 stuck = True
                 self.ash_stuck_counter += 1
+                self.ash_is_moving = loc
                 return stuck
-        if self.is_battling_fl:
+        elif self.is_battling_fl:
             if v_3 == 3:
                 self.battle_stuck_counter += 1
                 if self.battle_stuck_counter > 1000:
                     stuck = True
                     self.ash_stuck_counter += 1
                     #nprint("battle is stuck count=",self.battle_stuck_counter)
-                    return stuck
-                else:
-                    return stuck
-        self.ash_loc_dict.append(loc)
-        if len(self.ash_loc_dict) > 5000:
-            self.ash_loc_dict.pop(0)
         self.ash_stuck_counter = 0
         self.battle_stuck_counter = 0
         self.ash_is_moving = loc
@@ -453,6 +461,14 @@ class GbaGame(Env):
             else:
                 self.level_progress.append(v_1)
                 return 1
+
+    def new_pokemon_found(self):
+        v_1 = self.pyboy.get_memory_value(0xcfd9)
+        if v_1 not in self.pokemon_found_list:
+            self.pokemon_found_list.append(v_1)
+            return 1
+        else:
+            return 0
 
     def release_all_keys(self):
         self.pyboy.send_input(WindowEvent.RELEASE_ARROW_LEFT)

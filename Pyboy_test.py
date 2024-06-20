@@ -1,17 +1,17 @@
 from pyboy import PyBoy
 pyboy = PyBoy('ROMs/Pokemon_Yellow.gbc')
-game_state = 'ROMS/Pokemon_Yellow.gbc.state'
+game_state = 'ROMS/save_state_agent_979962'
 file_like_object = open(game_state, "rb")
 pyboy.load_state(file_like_object)
 while not pyboy.tick():
-    print("Number of turns in current battle = ", pyboy.get_memory_value(0xcc29))
-
+    # print("Number of turns in current battle = ", pyboy.get_memory_value(0xcc29))
+    # print ("Amount of damage attack will do = ", pyboy.get_memory_value(0xd0d8))
     # PLAYER_HP_ADDRESSES = [0xD16B, 0xD16C, 0xD198, 0xD1C4, 0xD1F0, 0xD21C]
     # total_hp = sum([pyboy.get_memory_value(address) for address in PLAYER_HP_ADDRESSES])
     # print(total_hp)
     # print("Enemy HP = ", pyboy.get_memory_value(0xcfe6))
     # value = pyboy.get_memory_value(0xd162)
-    # value2 = pyboy.get_memory_value(0xcfe6)
+    # value2 = pyboy.get_memory_value(0xcfe5)
     # value3 = pyboy.get_memory_value(0xd18b)
     # value4 = pyboy.get_memory_value(0xd1b7)
     # value5 = pyboy.get_memory_value(0xcff2)
@@ -27,7 +27,7 @@ while not pyboy.tick():
     # value15 = pyboy.get_memory_value(0xc0ed)
     # value3 = pyboy.get_memory_value(0xd8a3)
     # print('d162 = ', value) # No. pokemon in player party
-    # print('cfe6 = ', value2) # HP
+    # print('cfe5 = ', value2) # HP
     # print('d18b = ', value3) # Poke 1 level
     # print('d1b7 = ', value4) # Poke 2 level
     # print('cff2 = ', value5) # Level
@@ -42,5 +42,6 @@ while not pyboy.tick():
     # print('d056 = ', value14)
     # print('coed =', value15)
     # print('Pokemon = ', value3)
+    print('slot 1 enemy pokemon id = ', pyboy.get_memory_value(0xcfd9))
     pass
 pyboy.stop()
