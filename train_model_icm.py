@@ -1,13 +1,12 @@
 import logging
 from stable_baselines3.common.env_util import make_vec_env
-from stable_baselines3.common.vec_env import SubprocVecEnv, VecMonitor, VecEnvWrapper
+from stable_baselines3.common.vec_env import SubprocVecEnv, VecEnvWrapper
 from stable_baselines3.common.atari_wrappers import MaxAndSkipEnv
 import torch
 import gymnasium as gym
 from stable_baselines3 import PPO
 import environment_pyboy_neat_pkmn_yellow_icm as emt
 from callback import TrainAndLoggingCallback
-from stable_baselines3.common.monitor import Monitor
 from icm_module import ICM
 
 
@@ -57,7 +56,7 @@ def make_env(env_class):
 
 
 def train_model(env_class, model_path, time_steps):
-    n_envs = 8
+    n_envs = 32
     checkpoint_dir = './train/'
     log_dir = './logs/'
     env_class = emt.GbaGame
@@ -85,8 +84,8 @@ def train_model(env_class, model_path, time_steps):
     )
 
     model = PPO('CnnPolicy', env, policy_kwargs=policy_kwargs, tensorboard_log=log_dir,
-                verbose=1, gamma=0.99, n_steps=2048, n_epochs=2, batch_size=512, ent_coef=0.03,
-                learning_rate=0.00003)
+                verbose=1, gamma=0.99, n_steps=128, n_epochs=2, batch_size=64, ent_coef=0.03,
+                learning_rate=0.00003, device=device)
 
     if model_path:
         pass
@@ -101,4 +100,4 @@ if __name__ == '__main__':
     logger = logging.getLogger(__name__)
 
     model_pth = 'train/end_of_training_run8.zip'
-    train_model(emt.GbaGame, model_pth, time_steps=5000000)
+    train_model(emt.GbaGame, model_pth, time_steps=100000000)

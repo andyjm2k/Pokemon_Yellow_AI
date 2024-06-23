@@ -1,8 +1,8 @@
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import SubprocVecEnv, VecMonitor, DummyVecEnv
 from stable_baselines3.common.atari_wrappers import MaxAndSkipEnv
-
-import environment_pyboy_neat_pkmn_yellow as emt
+import torch
+import environment_pyboy_neat_pkmn_yellow_goal as emt
 import callback as cb
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3 import PPO
@@ -17,7 +17,7 @@ def make_env(env_class):
 
 
 def train_model(env_class, model_path, time_steps):
-    n_envs = 8
+    n_envs = 56
     checkpoint_dir = './train/'
     log_dir = './logs/'
     env_class = emt.GbaGame  # Replace with your actual environment class
@@ -25,6 +25,9 @@ def train_model(env_class, model_path, time_steps):
     # env = VecMonitor(SubprocVecEnv([make_env(env_class, i) for i in range(n_envs)]), "logs/TestMonitor")
     env = make_vec_env(make_env(env_class), n_envs=n_envs, monitor_dir=log_dir, vec_env_cls=SubprocVecEnv)
     # model_path = 'path_to_model'  # Replace with your actual model path
+
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
     total_time_steps = time_steps
     callback = cb.TrainAndLoggingCallback(check_freq=4096, save_path=checkpoint_dir)
 
@@ -33,8 +36,8 @@ def train_model(env_class, model_path, time_steps):
     )
 
     model = PPO('CnnPolicy', env, policy_kwargs=policy_kwargs, tensorboard_log=log_dir,
-                verbose=1, gamma=0.999, n_steps=2048,
-                n_epochs=2, batch_size=512, ent_coef=0.03, learning_rate=0.00003)
+                verbose=1, gamma=0.999, n_steps=128,
+                n_epochs=2, batch_size=64, ent_coef=0.03, learning_rate=0.00003, device=device)
     if model_path:
         pass
         # model.load(model_path)
@@ -44,5 +47,5 @@ def train_model(env_class, model_path, time_steps):
 
 
 if __name__ == '__main__':
-    model_pth = 'train/end_of_training_run12.zip'
-    train_model(emt.GbaGame, model_pth, time_steps=20000000)
+    model_pth = 'train/end_of_training_run1.zip'
+    train_model(emt.GbaGame, model_pth, time_steps=100000000)

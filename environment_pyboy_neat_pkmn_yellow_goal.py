@@ -15,7 +15,7 @@ import random
 
 
 class GbaGame(Env):
-    def __init__(self, max_episodes=400000):
+    def __init__(self, max_episodes=200000):
         super().__init__()
         self.frame_stack = deque(maxlen=1)
         self.frame_skip = 1  # Number of frames to skip
@@ -57,6 +57,8 @@ class GbaGame(Env):
         self.new_enemy_hp = 0
         self.agent_id = random.randint(1, 1000000)
         self.first_episode = True
+        self.previous_enemy_lvl = 1000
+        self.map_steps_dict = {}
         print('STARTED AGENT: ', self.agent_id)
 
     def reset_game_state(self):
@@ -78,6 +80,8 @@ class GbaGame(Env):
         self.new_total_hp = 0
         self.first_loc_check = 0
         self.new_enemy_hp = 0
+        self.previous_enemy_lvl = 1000
+        self.map_steps_dict = {}
 
     def step(self, action):
         total_reward = 0
@@ -128,16 +132,14 @@ class GbaGame(Env):
         return self.get_stacked_observation(), {}
 
     def render(self):
+        goal = self.get_goal()
         raw_screen = self.pyboy.botsupport_manager().screen().screen_ndarray()
         raw = np.array(raw_screen)[:, :, :3].astype(np.uint8)
-        # gray = cv2.cvtColor(raw, cv2.COLOR_BGR2GRAY)
-        # edges = cv2.Canny(gray, threshold1=100, threshold2=200)
-        # resized = cv2.resize(edges, (60, 60))
-        # resized = cv2.resize(edges, (120, 120))
-        # rgb = cv2.cvtColor(raw, cv2.COLOR_BGR2RGB)
-        # cv2.imshow('Game', resized)  # Display the cropped image
+        resized = cv2.resize(raw, (120, 120))
+        resized = self.add_color_block(resized, goal)
+
         label = str(self.agent_id)
-        cv2.imshow(label, raw)  # Display the cropped image
+        cv2.imshow(label, resized)  # Display the cropped image
         if cv2.waitKey(1) & 0xFF == ord('q'):
             self.close()
 
@@ -146,21 +148,16 @@ class GbaGame(Env):
         self.pyboy.stop()
 
     def get_observation(self):
+        self.update_map_steps(self.get_map_id(),1)
+        goal = self.get_goal()
         raw_screen = self.pyboy.botsupport_manager().screen().screen_ndarray()
         # print('raw_screen = ', np.shape(raw_screen))
         raw = np.array(raw_screen)[:, :, :3].astype(np.uint8)
-        gray = cv2.cvtColor(raw, cv2.COLOR_RGB2BGR)
-        # Define the top-left corner and the size of the crop area
-        # x_start = 25  # Starting x-coordinate of the crop area
-        # y_start = 40  # Starting y-coordinate of the crop area
-        # width = 120  # Width of the crop area
-        # height = 120  # Height of the crop area
-        # Crop the image
-        # cropped_image = gray[y_start:y_start + height, x_start:x_start + width]
-        # edges = cv2.Canny(gray, threshold1=100, threshold2=200)
-        # resized = cv2.resize(edges, (120, 120))
-        resized = cv2.resize(gray, (120, 120))
-        #return resized[:, :, np.newaxis]
+        # gray = cv2.cvtColor(raw, cv2.COLOR_RGB2GRAY)
+
+        resized = cv2.resize(raw, (120, 120))
+        resized = self.add_color_block(resized, goal)
+        # return resized[:, :, np.newaxis]
         return resized
 
     def get_stacked_observation(self):
@@ -206,7 +203,8 @@ class GbaGame(Env):
         self.frame_stack.append(observation)  # Each frame should have shape (80, 72, 1)
 
     def calculate_reward_and_done(self, action):
-        reward = self.calculate_reward_basic(action)
+        goal = self.get_goal()
+        reward = self.calculate_reward_basic(action, goal)
         self.total_reward += reward
         if self.truncated:
             done = True
@@ -252,15 +250,36 @@ class GbaGame(Env):
             print(self.agent_id)
             print("HP dropped")
         # print("No new points scored, reward remains 0")
+        was_flag_reached = self.found_flag()
+        if was_flag_reached:
+            reward += 2000
+            # print('flag reached')
+        is_episode_finished = self.timed_out()
+        if is_episode_finished:
+            # print('Timed Out at episode', self.episode_length)
+            reward += 0
+            self.truncated = True
+        # Call the function to detect if Mario is alive
+        did_ash_faint = self.detect_ash_faint()
+        # print("did_ash_faint = ",did_ash_faint)
+        if did_ash_faint:
+            # Apply the penalty for falling and set penalty_cap to True to avoid repeated penalties
+            reward += -1  # Assigning a negative reward
+            self.truncated = True
+            print("Ash is fainted")
         did_ash_get_stuck = self.is_ash_stuck()
         if did_ash_get_stuck:
-            if self.ash_stuck_counter >= 5000:
-                self.truncated = True
-                reward += -10
-                print(self.agent_id)
-                print("Ash not unstuck, exiting")
+            if self.ash_stuck_counter >= 3000:
+                reward += -0.01
+                # print("Ash is stuck")
+                # print("Ash stuck Counter =", self.ash_stuck_counter)
+                if self.ash_stuck_counter >= 5000:
+                    self.truncated = True
+                    reward += -10
+                    print(self.agent_id)
+                    print("Ash not unstuck, exiting")
         else:
-            if self.is_battling_fl is not True:
+            if self.is_battling_fl != True:
                 v_0 = self.pyboy.get_memory_value(0xd35d)
                 v_1 = self.pyboy.get_memory_value(0xd360)
                 v_2 = self.pyboy.get_memory_value(0xd361)
@@ -289,38 +308,9 @@ class GbaGame(Env):
             reward += 10
         return reward
 
-    def calculate_reward_basic(self, action):
+    def calculate_reward_basic(self, action, goal):
         # Set reward variable
         reward = 0
-        # Call get_score to see if a points sprite is detected in the obs
-        current_score = self.get_score()
-        # current_score = 0
-        # If there is no score detected then it will return 0
-        if current_score > 0:
-            # If there is a score detected then it will return the reward that matches
-            reward += current_score  # Setting reward equal to the score difference
-            # print(self.agent_id)
-            # print("reward: Total Lvls went up by=", current_score)
-        # encourage battling by rewarding when in battle mode
-        if self.battling():
-            reward += 0
-            # print(self.agent_id)
-            # print("battling")
-        if self.did_damage():
-            if self.new_enemy_hp == 0:
-                reward += 0
-                # print(self.agent_id)
-                # print("beat pokemon")
-            else:
-                reward += 0
-                # print(self.agent_id)
-                # print("did damage")
-        # Check if the total HP of your pokemon has dropped and penalise
-        if self.did_hp_drop():
-            reward += 0
-            # print(self.agent_id)
-            # print("HP dropped")
-        # print("No new points scored, reward remains 0")
         is_episode_finished = self.timed_out()
         if is_episode_finished:
             # print('Timed Out at episode', self.episode_length)
@@ -328,13 +318,77 @@ class GbaGame(Env):
             self.truncated = True
         did_ash_get_stuck = self.is_ash_stuck()
         if did_ash_get_stuck:
-            if self.ash_stuck_counter >= 5000:
-                self.truncated = True
-                reward += -10
-                # print(self.agent_id)
-                # print("Ash not unstuck, exiting")
-        else:
-            if self.is_battling_fl is not True:
+            if self.ash_stuck_counter >= 3000:
+                reward += -0.01
+                # print("Ash is stuck")
+                # print("Ash stuck Counter =", self.ash_stuck_counter)
+                if self.ash_stuck_counter >= 5000:
+                    self.truncated = True
+                    reward += -10
+                    print(self.agent_id)
+                    print("goal = ", goal)
+                    print("Ash not unstuck, exiting")
+        if goal == 'red':
+            current_score = self.get_score()
+            if current_score > 0:
+                # If there is a score detected then it will return the reward that matches
+                reward += current_score  # Setting reward equal to the score difference
+                print(self.agent_id)
+                print("goal = ", goal)
+                print("reward: Total Lvls went up by=", current_score)
+        # encourage battling by rewarding when in battle mode
+            if self.battling():
+                reward += 0.1
+                print(self.agent_id)
+                print("goal = ", goal)
+                print("battling")
+            if self.did_damage():
+                if self.new_enemy_hp == 0:
+                    reward += 1
+                    print(self.agent_id)
+                    print("goal = ", goal)
+                    print("beat pokemon")
+                else:
+                    reward += 0
+                    print(self.agent_id)
+                    print("goal = ", goal)
+                    print("did damage")
+        # Check if the total HP of your pokemon has dropped and penalise
+            if self.did_hp_drop():
+                reward += 0
+                print(self.agent_id)
+                print("goal = ", goal)
+                print("HP dropped")
+            if self.new_pokemon_found() == 1:
+                reward += 1
+                print(self.agent_id)
+                print("goal = ", goal)
+                print("Ash found a new pokemon reward")
+            if self.get_score() > 10:
+                reward += 10
+                print(self.agent_id)
+                print("goal = ", goal)
+                print("Ash caught a Pokemon")
+        # print("No new points scored, reward remains 0")
+        elif goal == 'cyan':
+            if self.new_pokemon_found() == 1:
+                reward += 1
+                print(self.agent_id)
+                print("goal = ", goal)
+                print("Ash found a new pokemon reward")
+            if self.get_score() > 10:
+                reward += 10
+                print(self.agent_id)
+                print("goal = ", goal)
+                print("Ash caught a Pokemon")
+        elif goal == 'green':
+            did_level_progress = self.level_did_progress()
+            if did_level_progress > 0:
+                print(self.agent_id)
+                print("goal = ", goal)
+                print("level progressed = ", self.level_progress)
+                reward += 10
+            if not self.is_battling_fl:
                 v_0 = self.pyboy.get_memory_value(0xd35d)
                 v_1 = self.pyboy.get_memory_value(0xd360)
                 v_2 = self.pyboy.get_memory_value(0xd361)
@@ -344,19 +398,9 @@ class GbaGame(Env):
                     self.ash_loc_dict.append(loc)
                     if len(self.ash_loc_dict) > 5000:
                         self.ash_loc_dict.pop(0)
-                    # print(self.agent_id)
-                    # print("Ash got explore reward")
-            else:
-                if self.new_pokemon_found() == 1:
-                    reward += 10
-                    # print(self.agent_id)
-                    # print("Ash found a new pokemon reward")
-
-        did_level_progress = self.level_did_progress()
-        if did_level_progress > 0:
-            # print(self.agent_id)
-            # print("level progressed = ", self.level_progress)
-            reward += 0
+                    print(self.agent_id)
+                    print("goal = ", goal)
+                    print("Ash got explore reward")
         return reward
 
     def detect_ash_faint(self):
@@ -399,7 +443,7 @@ class GbaGame(Env):
             self.first_episode = False
         else:
             gamestate_filenames = [
-                "ROMs/save_state_agent_{}"
+                "ROMs/Pokemon_Yellow.gbc.state"
             ]
             # Select a random filename from the list
             selected_filename = random.choice(gamestate_filenames)
@@ -450,11 +494,13 @@ class GbaGame(Env):
                     is_battling = False
                     self.is_battling_fl = True
                     self.new_enemy_hp = self.pyboy.get_memory_value(0xcfe6)
+                    self.previous_enemy_lvl = self.pyboy.get_memory_value(0xcff2)
                     return is_battling
                 else:
                     is_battling = True
                     self.is_battling_fl = True
                     self.new_enemy_hp = self.pyboy.get_memory_value(0xcfe6)
+                    self.previous_enemy_lvl = self.pyboy.get_memory_value(0xcff2)
                     # print("self.new_enemy_hp = ", self.pyboy.get_memory_value(0xcfe6))
                     return is_battling
         else:
@@ -523,6 +569,80 @@ class GbaGame(Env):
             return 1
         else:
             return 0
+
+    def get_goal(self):
+        total_lvls = self.current_score
+        enemy_lvl = self.previous_enemy_lvl
+        map_steps = self.get_map_steps(self.get_map_id())
+        new_pkm_fnd = self.new_pokemon_found()
+        num_poke_bll = self.pyboy.get_memory_value(0xd31e)
+
+        # Goal decision tree
+        # First Check total Pokemon Strength
+        if total_lvls > (enemy_lvl * 10):
+            too_strong = True
+        else:
+            too_strong = False
+        # Next Check total map steps taken
+        if map_steps > 100000:
+            too_many_steps = True
+        else:
+            too_many_steps = False
+        # finally check number of pokeballs in bag
+        if num_poke_bll == 0:
+            no_poke_bll = True
+        else:
+            no_poke_bll = False
+        # Goal setting
+        # Decision logic
+        if too_many_steps:
+            goal = 'green' # Seek new map
+        elif too_strong is False:
+            goal = 'red' # Power up Pokemon
+        elif new_pkm_fnd == 1:
+            goal = 'cyan' # Catch Pokemon
+        elif too_strong:
+            goal = 'green' # Explore Location
+        # elif no_poke_bll:
+            # goal = 'magenta' # Find poke mart and buy balls
+        else:
+            goal = 'green' # default to map seeking
+        return goal
+
+    # Function to update the dictionary
+    def update_map_steps(self, map_id, steps_taken):
+        if map_id in self.map_steps_dict:
+            self.map_steps_dict[map_id] += steps_taken
+        else:
+            self.map_steps_dict[map_id] = steps_taken
+
+    def get_map_steps(self,map_id):
+        return self.map_steps_dict.get(map_id, 0)
+
+    def get_map_id(self):
+        map_id = self.pyboy.get_memory_value(0xd35d)
+        return map_id
+
+    def add_color_block(self, image, color_name):
+        color_map = {
+            'blue': (255, 0, 0),
+            'green': (0, 255, 0),
+            'red': (0, 0, 255),
+            'yellow': (0, 255, 255),
+            'cyan': (255, 255, 0),
+            'magenta': (255, 0, 255)
+            # Add more colors as needed
+        }
+        # Convert color name to RGB value
+        if color_name not in color_map:
+            raise ValueError(
+                f"Color '{color_name}' not recognized. Please use one of the following colors: {', '.join(color_map.keys())}")
+        color = color_map[color_name]
+        # Create a 20x20 pixel block of the specified color
+        color_block = np.full((20, 20, 3), color, dtype=np.uint8)
+        # Overlay the color block on the top left corner of the image
+        image[0:20, 0:20] = color_block
+        return image
 
     def release_all_keys(self):
         self.pyboy.send_input(WindowEvent.RELEASE_ARROW_LEFT)

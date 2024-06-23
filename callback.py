@@ -1,4 +1,5 @@
-import environment as env
+import numpy as np
+import environment_pyboy_neat_pkmn_yellow as env
 
 
 class TrainAndLoggingCallback(env.BaseCallback):

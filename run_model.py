@@ -1,4 +1,4 @@
-import environment_pyboy_neat_pkmn_yellow_run as emt
+import environment_pyboy_neat_pkmn_yellow_goal as emt
 from stable_baselines3.common.atari_wrappers import MaxAndSkipEnv
 
 
@@ -26,5 +26,5 @@ def run_episodes(env_class, model_path, num_episodes=10):
 
 
 if __name__ == "__main__":
-    mdl_path = 'train/best_model_626688.zip'
+    mdl_path = 'train/best_model_24576.zip'
     run_episodes(emt.GbaGame, mdl_path, num_episodes=1)

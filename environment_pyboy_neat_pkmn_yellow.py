@@ -56,6 +56,7 @@ class GbaGame(Env):
         self.first_loc_check = 0
         self.new_enemy_hp = 0
         self.agent_id = random.randint(1, 1000000)
+        self.first_episode = True
         print('STARTED AGENT: ', self.agent_id)
 
     def reset_game_state(self):
@@ -108,6 +109,8 @@ class GbaGame(Env):
         # return observation, total_reward, done, info
 
     def reset(self, seed=None, options=None):
+        save_file_object = open("ROMs/save_state_agent_{}".format(self.agent_id), "wb")
+        self.pyboy.save_state(save_file_object)
         if self.pyboy_counter == 10000:
             self.pyboy.stop()
             del self.pyboy
@@ -203,7 +206,7 @@ class GbaGame(Env):
         self.frame_stack.append(observation)  # Each frame should have shape (80, 72, 1)
 
     def calculate_reward_and_done(self, action):
-        reward = self.calculate_reward(action)
+        reward = self.calculate_reward_basic(action)
         self.total_reward += reward
         if self.truncated:
             done = True
@@ -307,6 +310,76 @@ class GbaGame(Env):
             reward += 10
         return reward
 
+    def calculate_reward_basic(self, action):
+        # Set reward variable
+        reward = 0
+        # Call get_score to see if a points sprite is detected in the obs
+        current_score = self.get_score()
+        # current_score = 0
+        # If there is no score detected then it will return 0
+        if current_score > 0:
+            # If there is a score detected then it will return the reward that matches
+            reward += current_score  # Setting reward equal to the score difference
+            print(self.agent_id)
+            print("reward: Total Lvls went up by=", current_score)
+        # encourage battling by rewarding when in battle mode
+        if self.battling():
+            reward += 0
+            print(self.agent_id)
+            print("battling")
+        if self.did_damage():
+            if self.new_enemy_hp == 0:
+                reward += 0
+                print(self.agent_id)
+                print("beat pokemon")
+            else:
+                reward += 0
+                print(self.agent_id)
+                print("did damage")
+        # Check if the total HP of your pokemon has dropped and penalise
+        if self.did_hp_drop():
+            reward += 0
+            print(self.agent_id)
+            print("HP dropped")
+        # print("No new points scored, reward remains 0")
+        is_episode_finished = self.timed_out()
+        if is_episode_finished:
+            # print('Timed Out at episode', self.episode_length)
+            reward += 0
+            self.truncated = True
+        did_ash_get_stuck = self.is_ash_stuck()
+        if did_ash_get_stuck:
+            if self.ash_stuck_counter >= 5000:
+                self.truncated = True
+                reward += -10
+                print(self.agent_id)
+                print("Ash not unstuck, exiting")
+        else:
+            if self.is_battling_fl is not True:
+                v_0 = self.pyboy.get_memory_value(0xd35d)
+                v_1 = self.pyboy.get_memory_value(0xd360)
+                v_2 = self.pyboy.get_memory_value(0xd361)
+                loc = (v_1 * v_2) * v_0
+                if loc not in self.ash_loc_dict:
+                    reward += 0.001
+                    self.ash_loc_dict.append(loc)
+                    if len(self.ash_loc_dict) > 5000:
+                        self.ash_loc_dict.pop(0)
+                    print(self.agent_id)
+                    print("Ash got explore reward")
+            else:
+                if self.new_pokemon_found() == 1:
+                    reward += 10
+                    print(self.agent_id)
+                    print("Ash found a new pokemon reward")
+
+        did_level_progress = self.level_did_progress()
+        if did_level_progress > 0:
+            print(self.agent_id)
+            print("level progressed = ", self.level_progress)
+            reward += 0
+        return reward
+
     def detect_ash_faint(self):
         pass
         return False
@@ -342,14 +415,16 @@ class GbaGame(Env):
         for _ in range(self.wait_frames):  # tick for wait frames
             self.pyboy.tick()
         # List of specific filenames
-        gamestate_filenames = [
-            "ROMs/Pokemon_Yellow.gbc.state",
-            "ROMs/Pokemon_Yellow.gbc.state.old",
-            "ROMs/Pokemon_Yellow.gbc.state.pewter"
-        ]
-        # Select a random filename from the list
-        selected_filename = random.choice(gamestate_filenames)
-        file_like_object = open(selected_filename, "rb")
+        if self.first_episode:
+            selected_filename = "ROMs/Pokemon_Yellow.gbc.state"
+            self.first_episode = False
+        else:
+            gamestate_filenames = [
+                "ROMs/save_state_agent_{}"
+            ]
+            # Select a random filename from the list
+            selected_filename = random.choice(gamestate_filenames)
+        file_like_object = open(selected_filename.format(self.agent_id), "rb")
         self.pyboy.load_state(file_like_object)
 
     def get_score(self):
@@ -401,7 +476,7 @@ class GbaGame(Env):
                     is_battling = True
                     self.is_battling_fl = True
                     self.new_enemy_hp = self.pyboy.get_memory_value(0xcfe6)
-                    print("self.new_enemy_hp = ", self.pyboy.get_memory_value(0xcfe6))
+                    # print("self.new_enemy_hp = ", self.pyboy.get_memory_value(0xcfe6))
                     return is_battling
         else:
             self.is_battling_fl = False

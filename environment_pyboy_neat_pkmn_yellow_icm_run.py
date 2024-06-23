@@ -255,7 +255,7 @@ class GbaGame(Env):
         did_ash_get_stuck = self.is_ash_stuck()
         if did_ash_get_stuck:
             if self.ash_stuck_counter >= 5000:
-                self.truncated = True
+                self.truncated = False
                 reward += -10
                 print(self.agent_id)
                 print("Ash not unstuck, exiting")
@@ -299,27 +299,27 @@ class GbaGame(Env):
         if current_score > 0:
             # If there is a score detected then it will return the reward that matches
             reward += current_score  # Setting reward equal to the score difference
-            # print(self.agent_id)
-            # print("reward: Total Lvls went up by=", current_score)
+            print(self.agent_id)
+            print("reward: Total Lvls went up by=", current_score)
         # encourage battling by rewarding when in battle mode
         if self.battling():
             reward += 0
-            # print(self.agent_id)
-            # print("battling")
+            print(self.agent_id)
+            print("battling")
         if self.did_damage():
             if self.new_enemy_hp == 0:
                 reward += 0
-                # print(self.agent_id)
-                # print("beat pokemon")
+                print(self.agent_id)
+                print("beat pokemon")
             else:
                 reward += 0
-                # print(self.agent_id)
-                # print("did damage")
+                print(self.agent_id)
+                print("did damage")
         # Check if the total HP of your pokemon has dropped and penalise
         if self.did_hp_drop():
             reward += 0
-            # print(self.agent_id)
-            # print("HP dropped")
+            print(self.agent_id)
+            print("HP dropped")
         # print("No new points scored, reward remains 0")
         is_episode_finished = self.timed_out()
         if is_episode_finished:
@@ -329,10 +329,10 @@ class GbaGame(Env):
         did_ash_get_stuck = self.is_ash_stuck()
         if did_ash_get_stuck:
             if self.ash_stuck_counter >= 5000:
-                self.truncated = True
+                self.truncated = False
                 reward += -10
-                # print(self.agent_id)
-                # print("Ash not unstuck, exiting")
+                print(self.agent_id)
+                print("Ash not unstuck, exiting")
         else:
             if self.is_battling_fl is not True:
                 v_0 = self.pyboy.get_memory_value(0xd35d)
@@ -344,18 +344,18 @@ class GbaGame(Env):
                     self.ash_loc_dict.append(loc)
                     if len(self.ash_loc_dict) > 5000:
                         self.ash_loc_dict.pop(0)
-                    # print(self.agent_id)
-                    # print("Ash got explore reward")
+                    print(self.agent_id)
+                    print("Ash got explore reward")
             else:
                 if self.new_pokemon_found() == 1:
                     reward += 10
-                    # print(self.agent_id)
-                    # print("Ash found a new pokemon reward")
+                    print(self.agent_id)
+                    print("Ash found a new pokemon reward")
 
         did_level_progress = self.level_did_progress()
         if did_level_progress > 0:
-            # print(self.agent_id)
-            # print("level progressed = ", self.level_progress)
+            print(self.agent_id)
+            print("level progressed = ", self.level_progress)
             reward += 0
         return reward
 
@@ -395,7 +395,7 @@ class GbaGame(Env):
             self.pyboy.tick()
         # List of specific filenames
         if self.first_episode:
-            selected_filename = "ROMs/Pokemon_Yellow.gbc.state"
+            selected_filename = "ROMs/save_state_agent_{}"
             self.first_episode = False
         else:
             gamestate_filenames = [
@@ -455,7 +455,7 @@ class GbaGame(Env):
                     is_battling = True
                     self.is_battling_fl = True
                     self.new_enemy_hp = self.pyboy.get_memory_value(0xcfe6)
-                    # print("self.new_enemy_hp = ", self.pyboy.get_memory_value(0xcfe6))
+                    print("self.new_enemy_hp = ", self.pyboy.get_memory_value(0xcfe6))
                     return is_battling
         else:
             self.is_battling_fl = False
