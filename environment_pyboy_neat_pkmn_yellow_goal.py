@@ -89,6 +89,7 @@ class GbaGame(Env):
         info = {}
         for _ in range(self.frame_skip):
             if not done:
+                self.get_goal()
                 self.execute_action(action)
                 self.update_frame_stack()
                 observation = self.get_stacked_observation()
@@ -149,6 +150,7 @@ class GbaGame(Env):
 
     def get_observation(self):
         self.update_map_steps(self.get_map_id(),1)
+        self.pyboy.set_memory_value(0xd31e, 99)
         goal = self.get_goal()
         raw_screen = self.pyboy.botsupport_manager().screen().screen_ndarray()
         # print('raw_screen = ', np.shape(raw_screen))
@@ -283,7 +285,8 @@ class GbaGame(Env):
                 v_0 = self.pyboy.get_memory_value(0xd35d)
                 v_1 = self.pyboy.get_memory_value(0xd360)
                 v_2 = self.pyboy.get_memory_value(0xd361)
-                loc = (v_1 * v_2) * v_0
+                loc = self.calculate_location_hash(v_0, v_1, v_2)
+                # loc = (v_1 * v_2) * v_0
                 if loc not in self.ash_loc_dict:
                     reward += 0.001
                     self.ash_loc_dict.append(loc)
@@ -316,6 +319,23 @@ class GbaGame(Env):
             # print('Timed Out at episode', self.episode_length)
             reward += 0
             self.truncated = True
+        self.battling()
+        if not self.is_battling_fl:
+            v_0 = self.pyboy.get_memory_value(0xd35d)
+            v_1 = self.pyboy.get_memory_value(0xd360)
+            v_2 = self.pyboy.get_memory_value(0xd361)
+            loc = self.calculate_location_hash(v_0, v_1, v_2)
+            # loc = (v_1 * v_2) * v_0
+            if loc not in self.ash_loc_dict:
+                if goal == 'green':
+                    reward += 0.001
+                    print(self.agent_id)
+                    print("goal = ", goal)
+                    print("Ash got explore reward")
+                self.ash_loc_dict.append(loc)
+                if len(self.ash_loc_dict) > 5000:
+                    self.ash_loc_dict.pop(0)
+
         did_ash_get_stuck = self.is_ash_stuck()
         if did_ash_get_stuck:
             if self.ash_stuck_counter >= 3000:
@@ -388,19 +408,6 @@ class GbaGame(Env):
                 print("goal = ", goal)
                 print("level progressed = ", self.level_progress)
                 reward += 10
-            if not self.is_battling_fl:
-                v_0 = self.pyboy.get_memory_value(0xd35d)
-                v_1 = self.pyboy.get_memory_value(0xd360)
-                v_2 = self.pyboy.get_memory_value(0xd361)
-                loc = (v_1 * v_2) * v_0
-                if loc not in self.ash_loc_dict:
-                    reward += 0.001
-                    self.ash_loc_dict.append(loc)
-                    if len(self.ash_loc_dict) > 5000:
-                        self.ash_loc_dict.pop(0)
-                    print(self.agent_id)
-                    print("goal = ", goal)
-                    print("Ash got explore reward")
         return reward
 
     def detect_ash_faint(self):
@@ -474,7 +481,7 @@ class GbaGame(Env):
             else:
                 score = values - self.current_score
                 score = score * 10
-                self.current_score += score
+                self.current_score += values
         else:
             score = 0
         # print("score based reward =", score)
@@ -520,7 +527,8 @@ class GbaGame(Env):
         v_1 = self.pyboy.get_memory_value(0xd360)
         v_2 = self.pyboy.get_memory_value(0xd361)
         v_3 = self.pyboy.get_memory_value(0xcc29)
-        loc = (v_1 * v_2) * v_0
+        loc = self.calculate_location_hash(v_0, v_1, v_2)
+        # loc = (v_1 * v_2) * v_0
         last_20 = self.ash_loc_dict[-30:]
         if self.ash_is_moving == 0:
             self.ash_is_moving = loc
@@ -562,6 +570,15 @@ class GbaGame(Env):
                 self.level_progress.append(v_1)
                 return 1
 
+    def calculate_location_hash(self, map_id, x_coord, y_coord):
+        # Ensure the coordinates are within 0-255 range
+        x_coord = x_coord % 256
+        y_coord = y_coord % 256
+
+        # Create a unique hash
+        # This method allows for 256 maps, each with 256x256 coordinates
+        return (map_id << 16) | (x_coord << 8) | y_coord
+
     def new_pokemon_found(self):
         v_1 = self.pyboy.get_memory_value(0xcfd9)
         if v_1 not in self.pokemon_found_list:
@@ -574,7 +591,7 @@ class GbaGame(Env):
         total_lvls = self.current_score
         enemy_lvl = self.previous_enemy_lvl
         map_steps = self.get_map_steps(self.get_map_id())
-        new_pkm_fnd = self.new_pokemon_found()
+        new_pkm_fnd = self.pyboy.get_memory_value(0xcfd9)
         num_poke_bll = self.pyboy.get_memory_value(0xd31e)
 
         # Goal decision tree
@@ -584,7 +601,7 @@ class GbaGame(Env):
         else:
             too_strong = False
         # Next Check total map steps taken
-        if map_steps > 100000:
+        if map_steps > 10000000000000:
             too_many_steps = True
         else:
             too_many_steps = False
