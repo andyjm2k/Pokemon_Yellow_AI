@@ -15,7 +15,7 @@ import random
 
 
 class GbaGame(Env):
-    def __init__(self, max_episodes=200000):
+    def __init__(self, max_episodes=500000):
         super().__init__()
         self.frame_stack = deque(maxlen=1)
         self.frame_skip = 1  # Number of frames to skip
@@ -64,6 +64,9 @@ class GbaGame(Env):
         self.previous_enemy_lvl = 1000
         self.map_steps_dict = {}
         self.global_goal = ''
+        self.pkm_fnd = -1
+        self.pkm_cau = -1
+        self.pokemon_tally = 0
         print('STARTED AGENT: ', self.agent_id)
 
     def reset_game_state(self):
@@ -96,6 +99,9 @@ class GbaGame(Env):
         self.previous_enemy_lvl = 1000
         self.map_steps_dict = {}
         self.global_goal = ''
+        self.pkm_fnd = -1
+        self.pkm_cau = -1
+        self.pokemon_tally = 0
 
     def step(self, action):
         total_reward = 0
@@ -350,7 +356,7 @@ class GbaGame(Env):
                     print("Ash not unstuck, exiting")
         else:
             self.ash_stuck_counter = 0
-            if not self.is_battling_fl:
+            if not self.chk_battling():
                 v_0 = self.pyboy.get_memory_value(0xd35d)
                 v_1 = self.pyboy.get_memory_value(0xd360)
                 v_2 = self.pyboy.get_memory_value(0xd361)
@@ -365,36 +371,46 @@ class GbaGame(Env):
                     self.ash_loc_dict.append(loc)
                     if len(self.ash_loc_dict) > 5000:
                         self.ash_loc_dict.pop(0)
-        if goal == 'magenta':
-            if self.new_pokemon_found() == 1:
-                reward += 1
-                self.pokemon_found_list.append(self.pyboy.get_memory_value(0xcfd9))
-                print(self.agent_id)
-                print("goal = ", goal)
-                print("Ash found a new pokemon reward")
-            if self.new_pokemon_caught() == 1:
-                if self.get_score() > 10:
-                    reward += 10
-                    self.pokemon_caught_list.append(self.pyboy.get_memory_value(0xcfd9))
+        if self.chk_battling():
+            pkm_f = self.pkm_fnd
+            if pkm_f not in self.pokemon_found_list:
+                self.pokemon_found_list.append(pkm_f)
+                if goal == 'magenta':
+                    reward += 1
                     print(self.agent_id)
                     print("goal = ", goal)
-                    print("Ash caught a Pokemon")
-        elif goal == 'red':
+                    print("Ash discovered a Pokemon")
+                    # self.pokemon_found_list.append(self.pyboy.get_memory_value(0xcfd9))
+            pkm_c = self.pkm_cau
+            if pkm_c not in self.pokemon_caught_list:
+                v_1 = self.pokemon_caught()
+                if v_1 > self.pokemon_tally:
+                    self.pokemon_caught_list.append(pkm_c)
+                    self.pokemon_tally = v_1
+                    if goal == 'magenta':
+                        reward += 10
+                        print(self.agent_id)
+                        print("goal = ", goal)
+                        print("Ash caught a Pokemon")
+                        # self.pokemon_caught_list.append(self.pyboy.get_memory_value(0xcfd9))
             current_score = self.get_score()
-            if current_score == 10:
+            if current_score >= 10:
                 # If there is a score detected then it will return the reward that matches
-                reward += current_score  # Setting reward equal to the score difference
-                print(self.agent_id)
-                print("goal = ", goal)
-                print("reward: Total Lvls went up by=", (current_score/10))
-        # encourage battling by rewarding when in battle mode
-            if self.battling():
+                if goal == 'red':
+                    reward += current_score  # Setting reward equal to the score difference
+                    print(self.agent_id)
+                    print("goal = ", goal)
+                    print("reward: Total Lvls went up by=", (current_score/10))
+            # encourage battling by rewarding when in battle mode
+        if self.battling():
+            if goal == 'red':
                 reward += 0.1
                 print(self.agent_id)
                 print("goal = ", goal)
                 print("battling")
-            if self.did_damage():
-                if self.new_enemy_hp == 0:
+        if self.did_damage():
+            if self.new_enemy_hp == 0:
+                if goal == 'red':
                     reward += 1
                     print(self.agent_id)
                     print("goal = ", goal)
@@ -405,15 +421,16 @@ class GbaGame(Env):
                     print("goal = ", goal)
                     print("did damage")
         # Check if the total HP of your pokemon has dropped and penalise
-            if self.did_hp_drop():
+        if self.did_hp_drop():
+            if goal == 'red':
                 reward += 0
                 print(self.agent_id)
                 print("goal = ", goal)
                 print("HP dropped")
         # print("No new points scored, reward remains 0")
-        elif goal == 'blue':
-            did_level_progress = self.level_did_progress()
-            if did_level_progress > 0:
+        did_level_progress = self.level_did_progress()
+        if did_level_progress > 0:
+            if goal == 'blue':
                 print(self.agent_id)
                 print("goal = ", goal)
                 print("level progressed = ", self.level_progress)
@@ -467,6 +484,13 @@ class GbaGame(Env):
         file_like_object = open(selected_filename.format(self.agent_id), "rb")
         self.pyboy.load_state(file_like_object)
 
+    def pokemon_caught(self):
+        v_1 = self.pyboy.get_memory_value(0xd162)
+        v_2 = self.pyboy.get_memory_value(0xda7f)
+        values = v_1 + v_2
+        # print("Total Pokemon Count = ", values)
+        return values
+
     def get_score(self):
         d_1 = self.pyboy.get_memory_value(0xd18b)
         # print(d_1)
@@ -500,6 +524,13 @@ class GbaGame(Env):
     def found_flag(self):
         found = False
         return found
+
+    def chk_battling(self):
+        is_battling = False
+        if self.pyboy.get_memory_value(0xd056) != 0:
+            is_battling = True
+        return is_battling
+
 
     def battling(self):
         is_battling = False
@@ -577,18 +608,30 @@ class GbaGame(Env):
         return (map_id << 16) | (x_coord << 8) | y_coord
 
     def new_pokemon_found(self):
-        v_1 = self.pyboy.get_memory_value(0xcfd9)
-        if v_1 not in self.pokemon_found_list:
-            # print("new pokemon discovered")
-            return 1
+        if self.chk_battling():
+            v_1 = self.pyboy.get_memory_value(0xcfd9)
+            if v_1 not in self.pokemon_found_list:
+                self.pkm_fnd = v_1
+                # print(v_1)
+                # print(self.pokemon_found_list)
+                # print("new pokemon discovered")
+                return 1
+            else:
+                return 0
         else:
             return 0
 
     def new_pokemon_caught(self):
-        v_1 = self.pyboy.get_memory_value(0xcfd9)
-        if v_1 not in self.pokemon_caught_list:
-            # print("pokemon encountered but not caught")
-            return 1
+        if self.chk_battling():
+            v_1 = self.pyboy.get_memory_value(0xcfd9)
+            if v_1 not in self.pokemon_caught_list:
+                self.pkm_cau = v_1
+                # print (v_1)
+                # print(self.pokemon_caught_list)
+                # print("pokemon encountered but not caught")
+                return 1
+            else:
+                return 0
         else:
             return 0
 
@@ -597,7 +640,9 @@ class GbaGame(Env):
         enemy_lvl = self.previous_enemy_lvl
         map_steps = self.get_map_steps(self.get_map_id())
         new_pkm_fnd = self.new_pokemon_found()
+        new_pkm_cau = self.new_pokemon_caught()
         num_poke_bll = self.pyboy.get_memory_value(0xd31e)
+
 
         # Goal decision tree
         # First Check total Pokemon Strength
@@ -621,23 +666,34 @@ class GbaGame(Env):
             no_poke_bll = False
         # Goal setting
         # Decision logic
-        if self.is_battling_fl:
+        if self.pyboy.get_memory_value(0xd056) == 1:
+            # print('evaluated as battling wild pokemon')
+            # print('new_pkm_fnd = ', new_pkm_fnd)
             if new_pkm_fnd == 1:
+                # print("new pokemon goal set")
                 goal = 'magenta' # Catch Pokemon
-            elif self.new_pokemon_caught() == 1:
+                self.global_goal = goal
+                return goal
+            if  new_pkm_cau == 1:
+                # print('caught pokemon goal set')
                 goal = 'magenta' # Catch Pokemon
-            else:
-                goal = self.global_goal
-        elif too_many_steps:
+                self.global_goal = goal
+                return goal
+        if too_many_steps:
             goal = 'green' # explore location
-        elif too_strong is False:
+            self.global_goal = goal
+            return goal
+        if too_strong is False:
             goal = 'red' # Power up Pokemon
-        elif too_strong:
+            self.global_goal = goal
+            return goal
+        if too_strong:
             goal = 'green' # Explore Location
+            self.global_goal = goal
+            return goal
         # elif no_poke_bll:
             # goal = 'magenta' # Find poke mart and buy balls
-        else:
-            goal = 'green' # default to map seeking
+        goal = 'green' # default to map seeking
         self.global_goal = goal
         return goal
 
