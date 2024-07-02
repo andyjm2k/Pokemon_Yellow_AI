@@ -394,7 +394,7 @@ class GbaGame(Env):
                         print("Ash caught a Pokemon")
                         # self.pokemon_caught_list.append(self.pyboy.get_memory_value(0xcfd9))
             current_score = self.get_score()
-            if current_score >= 10:
+            if current_score == 10:
                 # If there is a score detected then it will return the reward that matches
                 if goal == 'red':
                     reward += current_score  # Setting reward equal to the score difference
@@ -569,7 +569,7 @@ class GbaGame(Env):
         v_2 = self.pyboy.get_memory_value(0xd361)
         v_3 = self.pyboy.get_memory_value(0xcc29)
         loc = (v_1, v_2, v_0)
-        last_20 = self.ash_loc_dict[-30:]
+        last_20 = self.ash_loc_dict[-50:]
         if self.ash_is_moving == (-1, -1, -1):
             # print("First check ash_is_moving")
             return stuck
