@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class LLMController:
     def __init__(self):
         # Initialize OpenAI client with API key from environment
-        self.api_key = 'AIzaSyCWB5SsdafyjD-2-Za8HEI4F4qcbslp9XY'
+        self.api_key = 'x'
         if not self.api_key:
             raise ValueError("OpenAI API key not found in environment variables")
         self.base_url = 'Https://generativelanguage.googleapis.com/v1beta/openai'
