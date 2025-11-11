@@ -17,7 +17,7 @@ def make_env(env_class):
 
 
 def train_model(env_class, model_path, time_steps):
-    n_envs = 56
+    n_envs = 1
     checkpoint_dir = './train/'
     log_dir = './logs/'
     env_class = emt.GbaGame  # Replace with your actual environment class
@@ -32,7 +32,7 @@ def train_model(env_class, model_path, time_steps):
     callback = cb.TrainAndLoggingCallback(check_freq=4096, save_path=checkpoint_dir)
 
     policy_kwargs = dict(
-        net_arch=[dict(pi=[256, 128, 64], vf=[256, 128, 64])]  # Example architecture: separate networks for policy and value
+        net_arch=[dict(pi=[512, 256, 128, 64], vf=[512, 256, 128, 64])]  # Example architecture: separate networks for policy and value
     )
 
     model = PPO('CnnPolicy', env, policy_kwargs=policy_kwargs, tensorboard_log=log_dir,

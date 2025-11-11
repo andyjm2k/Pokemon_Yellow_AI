@@ -1,4 +1,4 @@
-import environment_pyboy_neat_pkmn_yellow_goal as emt
+import environment_pyboy_neat_pkmn_yellow_goal_pf as emt
 from stable_baselines3.common.atari_wrappers import MaxAndSkipEnv
 
 
@@ -15,7 +15,7 @@ def run_episodes(env_class, model_path, num_episodes=10):
         while not done:
             action_array, _states = model.predict(obs, deterministic=False)
             action = int(action_array)
-            env.render()
+            # env.render()
             # print(f'Predicted action: {action}')  # Print the predicted action
             obs, reward, done, truncated, _ = env.step(action)
             total_reward += reward
@@ -26,5 +26,5 @@ def run_episodes(env_class, model_path, num_episodes=10):
 
 
 if __name__ == "__main__":
-    mdl_path = 'train/best_model_24576.zip'
+    mdl_path = 'train/training_run_snap_framestack-3_2.zip'
     run_episodes(emt.GbaGame, mdl_path, num_episodes=1)

@@ -1,10 +1,11 @@
 from pyboy import PyBoy
+from pyboy.utils import WindowEvent
 pyboy = PyBoy('ROMs/Pokemon_Yellow.gbc')
 game_state = 'ROMS/Pokemon_Yellow.gbc.state'
 file_like_object = open(game_state, "rb")
 pyboy.load_state(file_like_object)
-pyboy.set_memory_value(0xd31e, 99)
-while not pyboy.tick():
+# pyboy.set_memory_value(0xd31e, 99)
+while pyboy.tick():
     # print("Number of turns in current battle = ", pyboy.get_memory_value(0xcc29))
     # print ("Amount of damage attack will do = ", pyboy.get_memory_value(0xd0d8))
     # PLAYER_HP_ADDRESSES = [0xD16B, 0xD16C, 0xD198, 0xD1C4, 0xD1F0, 0xD21C]
@@ -43,6 +44,8 @@ while not pyboy.tick():
     # print('d056 = ', value14)
     # print('coed =', value15)
     # print('Pokemon = ', value3)
-    print('slot 1 enemy pokemon id = ', pyboy.get_memory_value(0xd31e))
+    # print('slot 1 enemy pokemon id = ', pyboy.get_memory_value(0xd31e))
+    # print('value = ', pyboy.get_memory_value(0xc507))
+    print(pyboy.memory[0xcf00])
     pass
 pyboy.stop()

@@ -10,7 +10,8 @@ from stable_baselines3.common.policies import ActorCriticPolicy
 from stable_baselines3.common.monitor import Monitor
 import os
 from collections import deque
-from pyboy import PyBoy, WindowEvent
+from pyboy import PyBoy
+from pyboy.utils import WindowEvent
 import random
 
 
@@ -23,8 +24,7 @@ class GbaGame(Env):
         self.observation_space = Box(low=0, high=255, shape=(120, 120, 3), dtype=np.uint8)
         self.action_space = Discrete(6)
         self.cap = mss()
-        self.pyboy = PyBoy('ROMs/Pokemon_Yellow.gbc', window_type="headless",
-                           window_scale=3, game_wrapper=False)
+        self.pyboy = PyBoy('ROMs/Pokemon_Yellow.gbc', window="null")
         self.game_location = {'top': 53, 'left': 0, 'width': 318, 'height': 339}
         self.score_location = {'top': 53, 'left': 65, 'width': 70, 'height': 25}
         self.done_location = {'top': 28, 'left': 21, 'width': 100, 'height': 79}
@@ -116,7 +116,7 @@ class GbaGame(Env):
                 # self.render()
                 self.current_step += 1
                 self.episode_length += 1
-                # print("self.new_enemy_hp = ", self.pyboy.get_memory_value(0xcfe6))
+                # print("self.new_enemy_hp = ", self.pyboy.memory[0xcfe6])
                 reward, done = self.calculate_reward_and_done(action)
                 truncated = self.truncated
                 if truncated:
@@ -140,8 +140,7 @@ class GbaGame(Env):
             self.pyboy.stop()
             del self.pyboy
             self.pyboy_counter = 0
-            self.pyboy = PyBoy('ROMs/Pokemon_Yellow.gbc', window_type="headless",
-                               window_scale=3, game_wrapper=False)
+            self.pyboy = PyBoy('ROMs/Pokemon_Yellow.gbc', window="null")
         if seed:
             np.random.seed(seed)
         self.reset_game_state()
@@ -156,7 +155,7 @@ class GbaGame(Env):
     def render(self):
         goal = self.global_goal
         # print('render = ', goal)
-        raw_screen = self.pyboy.botsupport_manager().screen().screen_ndarray()
+        raw_screen = self.pyboy.screen.ndarray
         raw = np.array(raw_screen)[:, :, :3].astype(np.uint8)
         resized = cv2.resize(raw, (120, 120))
         last = self.add_color_block(resized, goal)
@@ -172,9 +171,9 @@ class GbaGame(Env):
 
     def get_observation(self):
         self.update_map_steps(self.get_map_id(),1)
-        self.pyboy.set_memory_value(0xd31e, 99)
+        self.pyboy.memory[0xd31e] = 99
         goal = self.global_goal
-        raw_screen = self.pyboy.botsupport_manager().screen().screen_ndarray()
+        raw_screen = self.pyboy.screen.ndarray
         # print('raw_screen = ', np.shape(raw_screen))
         raw = np.array(raw_screen)[:, :, :3].astype(np.uint8)
         # gray = cv2.cvtColor(raw, cv2.COLOR_RGB2GRAY)
@@ -304,9 +303,9 @@ class GbaGame(Env):
                     print("Ash not unstuck, exiting")
         else:
             if self.is_battling_fl != True:
-                v_0 = self.pyboy.get_memory_value(0xd35d)
-                v_1 = self.pyboy.get_memory_value(0xd360)
-                v_2 = self.pyboy.get_memory_value(0xd361)
+                v_0 = self.pyboy.memory[0xd35d]
+                v_1 = self.pyboy.memory[0xd360]
+                v_2 = self.pyboy.memory[0xd361]
                 loc = self.calculate_location_hash(v_0, v_1, v_2)
                 # loc = (v_1 * v_2) * v_0
                 if loc not in self.ash_loc_dict:
@@ -357,9 +356,9 @@ class GbaGame(Env):
         else:
             self.ash_stuck_counter = 0
             if not self.chk_battling():
-                v_0 = self.pyboy.get_memory_value(0xd35d)
-                v_1 = self.pyboy.get_memory_value(0xd360)
-                v_2 = self.pyboy.get_memory_value(0xd361)
+                v_0 = self.pyboy.memory[0xd35d]
+                v_1 = self.pyboy.memory[0xd360]
+                v_2 = self.pyboy.memory[0xd361]
                 loc = (v_1, v_2, v_0)
                 self.ash_is_moving = loc
                 if loc not in self.ash_loc_dict:
@@ -380,7 +379,7 @@ class GbaGame(Env):
                     print(self.agent_id)
                     print("goal = ", goal)
                     print("Ash discovered a Pokemon")
-                    # self.pokemon_found_list.append(self.pyboy.get_memory_value(0xcfd9))
+                    # self.pokemon_found_list.append(self.pyboy.memory[0xcfd9])
             pkm_c = self.pkm_cau
             if pkm_c not in self.pokemon_caught_list:
                 v_1 = self.pokemon_caught()
@@ -392,7 +391,7 @@ class GbaGame(Env):
                         print(self.agent_id)
                         print("goal = ", goal)
                         print("Ash caught a Pokemon")
-                        # self.pokemon_caught_list.append(self.pyboy.get_memory_value(0xcfd9))
+                        # self.pokemon_caught_list.append(self.pyboy.memory[0xcfd9])
             current_score = self.get_score()
             if current_score == 10:
                 # If there is a score detected then it will return the reward that matches
@@ -444,8 +443,8 @@ class GbaGame(Env):
     def did_hp_drop(self):
         player_hp_addresses = [0xD16B, 0xD16C, 0xD198, 0xD1C4, 0xD1F0, 0xD21C]
         # player_max_hp_addresses = [0xD18C, 0xD18D, 0xD1B9, 0xD1E5, 0xD211, 0xD23D]
-        total_hp = sum([self.pyboy.get_memory_value(address) for address in player_hp_addresses])
-        # total_max_hp = sum([self.pyboy.get_memory_value(address) for address in player_max_hp_addresses])
+        total_hp = sum([self.pyboy.memory[address] for address in player_hp_addresses])
+        # total_max_hp = sum([self.pyboy.memory[address] for address in player_max_hp_addresses])
         hp_drop = False
         if self.new_total_hp == 0:
             self.new_total_hp = total_hp
@@ -459,7 +458,7 @@ class GbaGame(Env):
     def did_damage(self):
         damaged = False
         if self.is_battling_fl:
-            enemy_hp = self.pyboy.get_memory_value(0xcfe6)
+            enemy_hp = self.pyboy.memory[0xcfe6]
             if enemy_hp < self.new_enemy_hp:
                 damaged = True
                 self.new_enemy_hp = enemy_hp
@@ -485,24 +484,24 @@ class GbaGame(Env):
         self.pyboy.load_state(file_like_object)
 
     def pokemon_caught(self):
-        v_1 = self.pyboy.get_memory_value(0xd162)
-        v_2 = self.pyboy.get_memory_value(0xda7f)
+        v_1 = self.pyboy.memory[0xd162]
+        v_2 = self.pyboy.memory[0xda7f]
         values = v_1 + v_2
         # print("Total Pokemon Count = ", values)
         return values
 
     def get_score(self):
-        d_1 = self.pyboy.get_memory_value(0xd18b)
+        d_1 = self.pyboy.memory[0xd18b]
         # print(d_1)
-        d_2 = self.pyboy.get_memory_value(0xd1b7)
+        d_2 = self.pyboy.memory[0xd1b7]
         # print(d_2)
-        d_3 = self.pyboy.get_memory_value(0xd1e3)
+        d_3 = self.pyboy.memory[0xd1e3]
         # print(d_3)
-        d_4 = self.pyboy.get_memory_value(0xd20f)
+        d_4 = self.pyboy.memory[0xd20f]
         # print(d_4)
-        d_5 = self.pyboy.get_memory_value(0xd23b)
+        d_5 = self.pyboy.memory[0xd23b]
         # print(d_5)
-        d_6 = self.pyboy.get_memory_value(0xd267)
+        d_6 = self.pyboy.memory[0xd267]
         # print(d_6)
         values = d_1 + d_2 + d_3 + d_4 + d_5 + d_6
         # print("score mem add values =",values)
@@ -527,29 +526,29 @@ class GbaGame(Env):
 
     def chk_battling(self):
         is_battling = False
-        if self.pyboy.get_memory_value(0xd056) != 0:
+        if self.pyboy.memory[0xd056] != 0:
             is_battling = True
         return is_battling
 
 
     def battling(self):
         is_battling = False
-        if self.pyboy.get_memory_value(0xd056) != 0:
+        if self.pyboy.memory[0xd056] != 0:
             if self.is_battling_fl:
                 return is_battling
             else:
                 if self.new_enemy_hp != 0:
                     is_battling = False
                     self.is_battling_fl = True
-                    self.new_enemy_hp = self.pyboy.get_memory_value(0xcfe6)
-                    self.previous_enemy_lvl = self.pyboy.get_memory_value(0xcff2)
+                    self.new_enemy_hp = self.pyboy.memory[0xcfe6]
+                    self.previous_enemy_lvl = self.pyboy.memory[0xcff2]
                     return is_battling
                 else:
                     is_battling = True
                     self.is_battling_fl = True
-                    self.new_enemy_hp = self.pyboy.get_memory_value(0xcfe6)
-                    self.previous_enemy_lvl = self.pyboy.get_memory_value(0xcff2)
-                    # print("self.new_enemy_hp = ", self.pyboy.get_memory_value(0xcfe6))
+                    self.new_enemy_hp = self.pyboy.memory[0xcfe6]
+                    self.previous_enemy_lvl = self.pyboy.memory[0xcff2]
+                    # print("self.new_enemy_hp = ", self.pyboy.memory[0xcfe6])
                     return is_battling
         else:
             self.is_battling_fl = False
@@ -564,10 +563,10 @@ class GbaGame(Env):
 
     def is_ash_stuck(self):
         stuck = False
-        v_0 = self.pyboy.get_memory_value(0xd35d)
-        v_1 = self.pyboy.get_memory_value(0xd360)
-        v_2 = self.pyboy.get_memory_value(0xd361)
-        v_3 = self.pyboy.get_memory_value(0xcc29)
+        v_0 = self.pyboy.memory[0xd35d]
+        v_1 = self.pyboy.memory[0xd360]
+        v_2 = self.pyboy.memory[0xd361]
+        v_3 = self.pyboy.memory[0xcc29]
         loc = (v_1, v_2, v_0)
         last_20 = self.ash_loc_dict[-50:]
         if self.ash_is_moving == (-1, -1, -1):
@@ -575,7 +574,7 @@ class GbaGame(Env):
             return stuck
         self.ash_is_moving = loc
         if loc in last_20:
-            if self.pyboy.get_memory_value(0xd056) == 0:
+            if self.pyboy.memory[0xd056] == 0:
                 stuck = True
                 self.ash_stuck_counter += 1
                 # print("Ash is still in last 30 location zone=",self.ash_stuck_counter)
@@ -585,7 +584,7 @@ class GbaGame(Env):
                 return stuck
 
     def level_did_progress(self):
-        v_1 = self.pyboy.get_memory_value(0xd35d)
+        v_1 = self.pyboy.memory[0xd35d]
         # check if map location is in the registered list
         if v_1 in self.level_progress:
             return 0
@@ -609,7 +608,7 @@ class GbaGame(Env):
 
     def new_pokemon_found(self):
         if self.chk_battling():
-            v_1 = self.pyboy.get_memory_value(0xcfd9)
+            v_1 = self.pyboy.memory[0xcfd9]
             if v_1 not in self.pokemon_found_list:
                 self.pkm_fnd = v_1
                 # print(v_1)
@@ -623,7 +622,7 @@ class GbaGame(Env):
 
     def new_pokemon_caught(self):
         if self.chk_battling():
-            v_1 = self.pyboy.get_memory_value(0xcfd9)
+            v_1 = self.pyboy.memory[0xcfd9]
             if v_1 not in self.pokemon_caught_list:
                 self.pkm_cau = v_1
                 # print (v_1)
@@ -641,7 +640,7 @@ class GbaGame(Env):
         map_steps = self.get_map_steps(self.get_map_id())
         new_pkm_fnd = self.new_pokemon_found()
         new_pkm_cau = self.new_pokemon_caught()
-        num_poke_bll = self.pyboy.get_memory_value(0xd31e)
+        num_poke_bll = self.pyboy.memory[0xd31e]
 
 
         # Goal decision tree
@@ -666,7 +665,7 @@ class GbaGame(Env):
             no_poke_bll = False
         # Goal setting
         # Decision logic
-        if self.pyboy.get_memory_value(0xd056) == 1:
+        if self.pyboy.memory[0xd056] == 1:
             # print('evaluated as battling wild pokemon')
             # print('new_pkm_fnd = ', new_pkm_fnd)
             if new_pkm_fnd == 1:
@@ -708,7 +707,7 @@ class GbaGame(Env):
         return self.map_steps_dict.get(map_id, 0)
 
     def get_map_id(self):
-        map_id = self.pyboy.get_memory_value(0xd35d)
+        map_id = self.pyboy.memory[0xd35d]
         return map_id
 
     def add_color_block(self, image, color_name):

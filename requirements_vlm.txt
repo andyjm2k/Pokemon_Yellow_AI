@@ -1,0 +1,26 @@
+# Requirements for vendor-agnostic VLM integration with Pokemon Yellow environment
+
+# Core dependencies (already in your environment)
+gymnasium
+opencv-python
+numpy
+Pillow
+matplotlib
+pyboy
+
+# VLM integration dependencies
+requests>=2.25.0          # For HTTP API calls to any OpenAI-compatible endpoint
+PyYAML>=6.0              # For YAML configuration file parsing
+dataclasses>=0.6         # For configuration data structures (Python 3.7+)
+
+# Optional: Enhanced HTTP handling
+httpx>=0.24.0            # Alternative to requests with better async support (optional)
+
+# For testing and development
+pytest>=7.0.0            # For unit tests (optional)
+python-dotenv>=0.19.0    # For .env file support (optional)
+
+# API provider specific (install as needed):
+# openai>=1.0.0          # If using OpenAI directly (not required for generic integration)
+# anthropic>=0.3.0       # If using Anthropic via proxy
+# together>=0.2.0        # If using Together AI SDK (optional, requests works fine) 

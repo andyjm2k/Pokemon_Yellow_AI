@@ -1,0 +1,28 @@
+# Core dependencies for Pokemon Yellow AI training and running
+# Screen capture library
+mss
+
+# Computer vision library
+opencv-python
+
+# Numerical computing library
+numpy
+
+# Gymnasium environment for reinforcement learning
+gymnasium
+
+# Stable Baselines3 for PPO and RL algorithms
+stable-baselines3
+
+# PyBoy Game Boy emulator
+pyboy
+
+# PyTorch for deep learning (required by stable-baselines3)
+torch
+
+# LLM Controller dependencies
+# OpenAI client library for LLM API calls
+openai
+
+# Pillow for image processing (PIL)
+Pillow

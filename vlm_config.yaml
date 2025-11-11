@@ -1,0 +1,132 @@
+# VLM Configuration for Pokemon Yellow Environment
+# This config supports any OpenAI-compatible API endpoint
+
+vlm:
+  enabled: true
+  
+  # API Configuration - supports any OpenAI-compatible endpoint
+  api:
+    # Base URL for the API (without /v1/chat/completions)
+    # Examples:
+    # - OpenAI: "https://api.openai.com/v1"
+    # - Azure OpenAI: "https://your-resource.openai.azure.com"
+    # - Local LLaMA/Ollama: "http://localhost:11434/v1"
+    # - Anthropic (via proxy): "https://api.anthropic.com/v1"
+    # - Together AI: "https://api.together.xyz/v1"
+    # - Any other OpenAI-compatible service
+    base_url: "https://api.openai.com/v1"
+    
+    # API key for authentication
+    # Can be overridden by environment variable: VLM_API_KEY
+    api_key: null
+    
+    # Model name to use for vision tasks
+    # Examples:
+    # - OpenAI: "gpt-4-vision-preview" or "gpt-4o"
+    # - Local models: "llava:latest", "bakllava:latest"
+    # - Other services: check their model names
+    model: "gpt-4-vision-preview"
+    
+    # Additional headers for API requests (optional)
+    headers: {}
+    
+    # Request timeout in seconds
+    timeout: 30
+    
+    # API-specific parameters
+    parameters:
+      max_tokens: 300
+      temperature: 0.7
+      top_p: 1.0
+      # Add any other model-specific parameters here
+  
+  # Decision Making Configuration
+  decision:
+    # Minimum confidence threshold (0.0-1.0) to use VLM decisions
+    confidence_threshold: 0.75
+    
+    # How often to consult VLM (every N steps)
+    call_frequency: 10
+    
+    # Number of steps to use VLM action for high-confidence decisions
+    override_steps: 3
+    
+    # High confidence threshold for multi-step overrides
+    high_confidence_threshold: 0.9
+  
+  # Conditions when VLM should be consulted
+  conditions:
+    # Always use VLM during battles
+    use_in_battle: true
+    
+    # Use VLM when stuck (steps at same position)
+    use_when_stuck: true
+    stuck_threshold: 10
+    
+    # Use VLM for specific goals
+    use_for_goals: ["red", "magenta"]  # Combat and Pokemon catching
+    
+    # Use VLM when really stuck (ash_stuck_counter)
+    use_when_really_stuck: true
+    really_stuck_threshold: 1000
+    
+    # Enable periodic VLM checks
+    periodic_checks: true
+  
+  # Prompt Configuration
+  prompts:
+    # System prompt template
+    system_prompt: |
+      You are an expert Pokemon Yellow player. Analyze the game screen and context to determine the best action.
+      Always respond with valid JSON containing action, confidence, and reasoning.
+    
+    # Context template for building prompts
+    context_template: |
+      Current context:
+      - Goal: {current_goal}
+      - Battling: {is_battling}
+      - Position: {ash_position}
+      - HP: {ash_hp}
+      - Steps stuck: {steps_at_same_position}
+      - Last action: {last_action}
+      - Has planned path: {has_path}
+      - Episode length: {episode_length}
+    
+    # Action guidance
+    action_guidance: |
+      Available actions:
+      0: Press A (interact/select/confirm)
+      1: Move Right
+      2: Move Left  
+      3: Move Up
+      4: Move Down
+      5: Press B (back/cancel/run)
+      
+      Respond in JSON format:
+      {
+          "action": <action_number>,
+          "confidence": <0.0-1.0>,
+          "reasoning": "<brief explanation>"
+      }
+      
+      Guidelines:
+      - If battling: Use action 0 (A) to select moves/attacks
+      - If stuck: Try different movement directions (1-4)
+      - If in menu: Use A to select, B to back out
+      - If exploring: Move towards unexplored areas
+      - Consider the current goal when making decisions
+
+# Logging configuration for VLM
+logging:
+  # Log VLM decisions
+  log_decisions: true
+  
+  # Log API calls and responses
+  log_api_calls: false
+  
+  # Log level for VLM-related logs
+  log_level: "INFO"
+  
+  # Save VLM interaction history to file
+  save_history: false
+  history_file: "vlm_history.json" 
