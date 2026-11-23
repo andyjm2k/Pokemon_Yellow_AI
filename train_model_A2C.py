@@ -1,8 +1,9 @@
 from stable_baselines3.common.env_util import make_vec_env
+import os
 from stable_baselines3.common.vec_env import SubprocVecEnv, VecMonitor, DummyVecEnv
 from stable_baselines3.common.atari_wrappers import MaxAndSkipEnv
 
-import environment_pyboy as emt
+import environment_pyboy_neat_pkmn_yellow as emt
 import callback as cb
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3 import A2C
@@ -36,9 +37,11 @@ def train_model(env_class, model_path, time_steps):
                 learning_rate=0.00003, verbose=1,
                 gamma=0.99, ent_coef=0.01, n_steps=5,
                 use_rms_prop=True)
-    if model_path:
-        pass
-        # model.load(model_path)
+    if model_path and os.path.exists(model_path):
+        print(f"Resuming training from {model_path}")
+        model = A2C.load(model_path, env=env)
+    elif model_path:
+        print(f"Resume checkpoint {model_path} not found; starting a new model.")
 
     model.learn(total_timesteps=total_time_steps, callback=callback)
     env.close()

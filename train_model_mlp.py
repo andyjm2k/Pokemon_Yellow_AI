@@ -1,4 +1,5 @@
 from stable_baselines3.common.env_util import make_vec_env
+import os
 from stable_baselines3.common.vec_env import SubprocVecEnv, VecMonitor, DummyVecEnv
 from stable_baselines3.common.atari_wrappers import MaxAndSkipEnv
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
@@ -136,9 +137,11 @@ def train_model(env_class, model_path, time_steps):
     model = PPO('MultiInputPolicy', env, policy_kwargs=policy_kwargs, tensorboard_log=log_dir,
                 verbose=1, gamma=0.999, n_steps=2048,
                 n_epochs=2, batch_size=512, ent_coef=0.03, learning_rate=0.00003)
-    if model_path:
-        pass
-        # model.load(model_path)
+    if model_path and os.path.exists(model_path):
+        print(f"Resuming training from {model_path}")
+        model = PPO.load(model_path, env=env)
+    elif model_path:
+        print(f"Resume checkpoint {model_path} not found; starting a new model.")
 
     model.learn(total_timesteps=total_time_steps, callback=callback)
     env.close()

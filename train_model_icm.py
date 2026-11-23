@@ -1,4 +1,5 @@
 import logging
+import os
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import SubprocVecEnv, VecEnvWrapper
 from stable_baselines3.common.atari_wrappers import MaxAndSkipEnv
@@ -36,6 +37,9 @@ class ICMWrapper(VecEnvWrapper):
 
             intrinsic_rewards = self.icm.compute_intrinsic_reward(obs_tensor, next_obs_tensor, actions_tensor)
             rewards += intrinsic_rewards.detach().cpu().numpy()
+            # Train the curiosity module on this transition so the
+            # intrinsic reward is learned, not noise from a random net.
+            self.icm.train_step(obs_tensor, next_obs_tensor, actions_tensor)
 
         self.last_obs = next_obs  # Update last_obs with the current obs
         return obs, rewards, dones, info
@@ -87,9 +91,11 @@ def train_model(env_class, model_path, time_steps):
                 verbose=1, gamma=0.99, n_steps=128, n_epochs=2, batch_size=64, ent_coef=0.03,
                 learning_rate=0.00003, device=device)
 
-    if model_path:
-        pass
-        # model.load(model_path)
+    if model_path and os.path.exists(model_path):
+        print(f"Resuming training from {model_path}")
+        model = PPO.load(model_path, env=env)
+    elif model_path:
+        print(f"Resume checkpoint {model_path} not found; starting a new model.")
 
     model.learn(total_timesteps=total_time_steps, callback=callback)
     env.close()

@@ -1,5 +1,24 @@
 # Pokemon Yellow AI Agent
 
+> Fix-first batch (Nov 2026): the `frame_wait` no-op loop in the PPO+LLM
+> env (`environment_pyboy_neat_pkmn_yellow_goal_pf.py`) is removed, the
+> `get_score` 10x inflation in the base/ICM envs is fixed, the A2C script
+> imports the real env, NEAT's input size matches the observation
+> (43200) and fitness is the mean across episodes, ICM is actually
+> trained, the MLP position features use the correct memory map, model
+> resume (`model_path`) now loads instead of being a no-op, and episodes
+> genuinely restart from `ROMs/Pokemon_Yellow.gbc.state`.
+
+> **PPO + LLM harness (the goal):** `environment_pyboy_neat_pkmn_yellow_goal_pf.py`
+> pairs a PPO policy with a VLM/LLM override and SLAM pathfinding
+> (VLM → LLM → SLAM → PPO, see `run_model.py`). That hierarchy is
+> intentionally preserved, not stripped out.
+
+> **Infinite Poke Balls is opt-in only:** `GbaGame(infinite_balls=True)`
+> forces 99 Poke Balls in `get_observation()`. It defaults to off — with
+> it on, "caught Pokemon" results are not a normal playthrough and must
+> not be reported as one.
+
 This repository contains a reinforcement learning environment and agent for playing Pokémon Yellow on the Game Boy Advance using the [PyBoy](https://github.com/Baekalfen/PyBoy) emulator. The environment is built using OpenAI's Gymnasium framework and the agent uses [Stable Baselines 3](https://github.com/DLR-RM/stable-baselines3) for training.
 
 ## Features
