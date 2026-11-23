@@ -1,4 +1,5 @@
 from stable_baselines3.common.env_util import make_vec_env
+import os
 from stable_baselines3.common.vec_env import SubprocVecEnv, VecMonitor, DummyVecEnv
 from stable_baselines3.common.atari_wrappers import MaxAndSkipEnv
 
@@ -33,9 +34,11 @@ def train_model(env_class, model_path, time_steps):
                 gamma=0.99, learning_starts=1024, train_freq=102400,
                 target_update_interval=40960,
                 exploration_fraction=0.5)
-    if model_path:
-        pass
-        # model.load(model_path)
+    if model_path and os.path.exists(model_path):
+        print(f"Resuming training from {model_path}")
+        model = DQN.load(model_path, env=env)
+    elif model_path:
+        print(f"Resume checkpoint {model_path} not found; starting a new model.")
 
     model.learn(total_timesteps=total_time_steps, callback=callback)
     env.close()

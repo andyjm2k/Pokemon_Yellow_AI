@@ -62,7 +62,7 @@ logger = logging.getLogger(__name__)
 
 
 class GbaGame(Env):
-    def __init__(self, max_episodes=500000):
+    def __init__(self, max_episodes=500000, infinite_balls=False):
         super().__init__()
         # Initialize necessary attributes
         self.curiosity_map = defaultdict(lambda: defaultdict(lambda: 1.0))  # High curiosity initially
@@ -91,6 +91,10 @@ class GbaGame(Env):
         self.current_frontier = None
         self.map_offsets = {}
         self.max_episodes = max_episodes
+        # Opt-in only: force 99 Poke Balls in get_observation().
+        # Default off — with it on, 'caught Pokemon' results are
+        # not a normal playthrough and must not be reported as one.
+        self.infinite_balls = infinite_balls
         self.agent_id = random.randint(1, 1000000)
         self.first_episode = True
         self.initial_observation = True
@@ -133,8 +137,6 @@ class GbaGame(Env):
         self.fully_explored_maps = set()
         self.transition_positions = defaultdict(set)  # map_id -> set of (x, y)
         self.last_transition_index = -1
-        self.frame_wait = 24
-        self.frame_wait_count = 0
         self.ppo_action = 0
         self.old_frontier = None
         self.ash_hp = 0
@@ -239,7 +241,6 @@ class GbaGame(Env):
         self.fully_explored_maps = set()
         self.transition_positions = defaultdict(set)  # map_id -> set of (x, y)
         self.last_transition_index = -1
-        self.frame_wait_count = 0
         self.old_frontier = None
         self.ash_hp = 0
         self.pkm_one = None
@@ -550,26 +551,6 @@ class GbaGame(Env):
                 self.random_action_steps_remaining = 0
                 self.ppo_action = action
                 previous_ash_position = self.ash_position
-                if self.frame_wait_count <= self.frame_wait:
-                    self.last_action = None
-                    self.execute_action(self.last_action)
-                    self.pyboy.tick(1, False)
-                    if not self.is_battling_fl:
-                        self.ash_old_position = self.ash_position
-                        self.ash_position = self.get_ash_position()
-                        self.ash_loc_history.append(self.ash_position)
-                        self.update_slam_map()
-
-                    self.update_frame_stack()
-
-                    self.episode_length += 1
-                    reward, done = self.calculate_reward_and_done(self.last_action)
-                    truncated = self.truncated
-                    if truncated:
-                        info = {}
-                    self.frame_wait_count += 1
-                    return self.get_stacked_observation(), reward, done, truncated, info
-                self.frame_wait_count = 0
                 
                 # Check if VLM should override action decision
                 vlm_action = self.vlm_action_decision()
@@ -1004,7 +985,8 @@ class GbaGame(Env):
         self.pyboy.stop()
 
     def get_observation(self):
-        self.pyboy.memory[0xd31e] = 99
+        if self.infinite_balls:
+            self.pyboy.memory[0xd31e] = 99
         goal = self.global_goal
         raw_screen = self.pyboy.screen.ndarray
         raw_screen = cv2.cvtColor(raw_screen, cv2.COLOR_BGR2RGB)

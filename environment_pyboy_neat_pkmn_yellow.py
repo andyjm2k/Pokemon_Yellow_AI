@@ -109,8 +109,6 @@ class GbaGame(Env):
         # return observation, total_reward, done, info
 
     def reset(self, seed=None, options=None):
-        save_file_object = open("ROMs/save_state_agent_{}".format(self.agent_id), "wb")
-        self.pyboy.save_state(save_file_object)
         if self.pyboy_counter == 10000:
             self.pyboy.stop()
             del self.pyboy
@@ -419,13 +417,13 @@ class GbaGame(Env):
             selected_filename = "ROMs/Pokemon_Yellow.gbc.state"
             self.first_episode = False
         else:
-            gamestate_filenames = [
-                "ROMs/save_state_agent_{}"
-            ]
-            # Select a random filename from the list
-            selected_filename = random.choice(gamestate_filenames)
-        file_like_object = open(selected_filename.format(self.agent_id), "rb")
-        self.pyboy.load_state(file_like_object)
+            # Always restart from the provided save state. Previously this
+            # loaded the per-agent file that reset() had just overwritten
+            # with the agent's current position, so episodes 2+ did not
+            # restart from the beginning.
+            selected_filename = "ROMs/Pokemon_Yellow.gbc.state"
+        with open(selected_filename.format(self.agent_id), "rb") as file_like_object:
+            self.pyboy.load_state(file_like_object)
 
     def get_score(self):
         d_1 = self.pyboy.get_memory_value(0xd18b)
@@ -451,7 +449,7 @@ class GbaGame(Env):
             else:
                 score = values - self.current_score
                 score = score * 10
-                self.current_score += score
+                self.current_score += values
         else:
             score = 0
         # print("score based reward =", score)

@@ -18,7 +18,7 @@ parser = argparse.ArgumentParser(description='OpenAI Gym Solver')
 parser.add_argument('--max-steps', dest='max_steps', type=int, default=1000,
                     help='The max number of steps to take per genome (timeout)')
 parser.add_argument('--episodes', type=int, default=1,
-                    help="The number of times to run a single genome. This takes the fitness score from the worst run")
+                    help="The number of times to run a single genome. Fitness is the mean score across runs")
 parser.add_argument('--render', action='store_true')
 parser.add_argument('--generations', type=int, default=50,
                     help="The number of generations to evolve the network")
@@ -40,7 +40,7 @@ def preprocess_observation(obs):
     return normalized_obs
 
 
-def simulate_species(net, env, episodes=1, steps=100000, render=False):
+def simulate_species(net, env, episodes=1, steps=1000, render=False):
     fitnesses = []
     for _ in range(episodes):
         obs, _ = env.reset()
@@ -57,19 +57,19 @@ def simulate_species(net, env, episodes=1, steps=100000, render=False):
             obs, reward, done, trunc, _ = env.step(action)
             if render:
                 env.render()
+            # Count the final step's reward before breaking out.
+            cum_reward += reward
             if done:
                 break
-            cum_reward += reward
 
         fitnesses.append(cum_reward)
 
+    # Fitness is the mean across episodes, not the best single run.
     fitness_avg = np.mean(fitnesses)
-    fitness_max = np.max(fitnesses)
     gc.collect()
 
     # print("Species avg fitness: %s" % str(fitness_avg))
-    # print("Species max fitness: %s" % str(fitness_max))
-    return fitness_max
+    return fitness_avg
 
 
 def worker_evaluate_genome(g, config):

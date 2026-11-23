@@ -30,6 +30,10 @@ class ICM(nn.Module):
             nn.Linear(256, action_size)
         )
 
+        # Optimizer for the curiosity module (created here so
+        # train_step() can update the inverse/forward models).
+        self.optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
+
         # Forward model network
         self.forward_model = nn.Sequential(
             nn.Linear(feature_dim + action_size, 512),  # Increased layer size
@@ -68,3 +72,26 @@ class ICM(nn.Module):
         # print(f"intrinsic_reward shape: {intrinsic_reward.shape}")
 
         return intrinsic_reward
+
+    def train_step(self, state, next_state, action, beta=0.2):
+        """One ICM update on a batch of transitions.
+
+        Inverse loss (cross-entropy on the predicted action) + forward
+        loss (MSE on the predicted next-state features). Without this,
+        compute_intrinsic_reward() is just noise from a randomly
+        initialised network that never learns.
+        """
+        pred_action, pred_next_state_features, next_state_features = self.forward(
+            state, next_state, action
+        )
+        inverse_loss = F.cross_entropy(pred_action, action.long())
+        forward_loss = F.mse_loss(pred_next_state_features, next_state_features)
+        loss = (1 - beta) * inverse_loss + beta * forward_loss
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+        return {
+            "icm_loss": float(loss.detach()),
+            "icm_inverse_loss": float(inverse_loss.detach()),
+            "icm_forward_loss": float(forward_loss.detach()),
+        }
