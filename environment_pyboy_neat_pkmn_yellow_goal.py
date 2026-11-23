@@ -16,7 +16,7 @@ import random
 
 
 class GbaGame(Env):
-    def __init__(self, max_episodes=500000):
+    def __init__(self, max_episodes=500000, infinite_balls=False):
         super().__init__()
         self.frame_stack = deque(maxlen=1)
         self.frame_skip = 1  # Number of frames to skip
@@ -37,6 +37,10 @@ class GbaGame(Env):
         self.episode_length = 0
         self.current_score = 0
         self.max_episodes = max_episodes
+        # Opt-in only: force 99 Poke Balls in get_observation().
+        # Default off — with it on, 'caught Pokemon' results are
+        # not a normal playthrough and must not be reported as one.
+        self.infinite_balls = infinite_balls
         self.wait_frames = 1
         self.initial_observation = True
         self.pyboy_counter = 0
@@ -134,8 +138,6 @@ class GbaGame(Env):
         # return observation, total_reward, done, info
 
     def reset(self, seed=None, options=None):
-        save_file_object = open("ROMs/save_state_agent_{}".format(self.agent_id), "wb")
-        self.pyboy.save_state(save_file_object)
         if self.pyboy_counter == 10000:
             self.pyboy.stop()
             del self.pyboy
@@ -171,7 +173,8 @@ class GbaGame(Env):
 
     def get_observation(self):
         self.update_map_steps(self.get_map_id(),1)
-        self.pyboy.memory[0xd31e] = 99
+        if self.infinite_balls:
+            self.pyboy.memory[0xd31e] = 99
         goal = self.global_goal
         raw_screen = self.pyboy.screen.ndarray
         # print('raw_screen = ', np.shape(raw_screen))
@@ -480,8 +483,8 @@ class GbaGame(Env):
             ]
             # Select a random filename from the list
             selected_filename = random.choice(gamestate_filenames)
-        file_like_object = open(selected_filename.format(self.agent_id), "rb")
-        self.pyboy.load_state(file_like_object)
+        with open(selected_filename.format(self.agent_id), "rb") as file_like_object:
+            self.pyboy.load_state(file_like_object)
 
     def pokemon_caught(self):
         v_1 = self.pyboy.memory[0xd162]
