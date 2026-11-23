@@ -160,9 +160,11 @@ class GbaGame(Env):
         return resized[:, :, np.newaxis]
 
     def get_additional_features(self):
-        x_coord = self.pyboy.get_memory_value(0xd35d)  # Replace with actual memory address for x-coordinate
-        y_coord = self.pyboy.get_memory_value(0xd360)  # Replace with actual memory address for y-coordinate
-        map_id = self.pyboy.get_memory_value(0xd361)  # Replace with actual memory address for map ID
+        # Memory map: 0xd35d = map ID, 0xd360 = Y coordinate,
+        # 0xd361 = X coordinate (see GbaGame.get_ash_position).
+        map_id = self.pyboy.get_memory_value(0xd35d)
+        y_coord = self.pyboy.get_memory_value(0xd360)
+        x_coord = self.pyboy.get_memory_value(0xd361)
         return np.array([x_coord, y_coord, map_id], dtype=np.float32)
 
     def get_observation(self):
@@ -346,8 +348,8 @@ class GbaGame(Env):
         ]
         # Select a random filename from the list
         selected_filename = random.choice(gamestate_filenames)
-        file_like_object = open(selected_filename, "rb")
-        self.pyboy.load_state(file_like_object)
+        with open(selected_filename, "rb") as file_like_object:
+            self.pyboy.load_state(file_like_object)
 
     def get_score(self):
         d_1 = self.pyboy.get_memory_value(0xd18b)
